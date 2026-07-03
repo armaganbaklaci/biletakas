@@ -9,10 +9,16 @@ var SUPABASE_READY = false;
     }
 
     sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: 'Bearer ' + SUPABASE_ANON_KEY
+        }
+      },
       auth: {
         persistSession: true,
-        autoRefreshToken: true,
-      },
+        autoRefreshToken: true
+      }
     });
 
     window.sb = sb;
