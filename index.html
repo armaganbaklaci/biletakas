@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="tr" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>biletakas — Güvenli Konser Bileti Takası</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            surface: {
+              900: '#0a0a0f',
+              800: '#12121a',
+              700: '#1a1a26',
+              600: '#242433',
+            },
+            accent: {
+              DEFAULT: '#8b5cf6',
+              light: '#a78bfa',
+              glow: '#c4b5fd',
+            },
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            display: ['Outfit', 'Inter', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            glow: '0 0 40px -10px rgba(139, 92, 246, 0.45)',
+            card: '0 4px 24px -4px rgba(0, 0, 0, 0.5)',
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <!-- Supabase JS SDK -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="min-h-screen bg-surface-900 text-zinc-100 font-sans antialiased pb-16 sm:pb-0">
+
+  <!-- Auth Bar -->
+  <div class="border-b border-white/5 bg-surface-900/80 backdrop-blur-sm sticky top-0 z-30">
+    <div class="max-w-2xl mx-auto px-5 py-2.5 flex items-center justify-end gap-2 text-xs sm:text-sm">
+      <div id="auth-logged-out">
+        <div class="flex items-center gap-2">
+          <button type="button" id="btn-open-login" class="px-3 py-1.5 rounded-lg font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors">Giriş Yap</button>
+          <button type="button" id="btn-open-register" class="px-3 py-1.5 rounded-lg font-semibold bg-accent/15 text-accent-light hover:bg-accent/25 transition-colors">Kayıt Ol</button>
+        </div>
+      </div>
+      <div id="auth-logged-in" class="hidden">
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
+          <span class="px-2.5 py-1 rounded-lg bg-surface-800 border border-white/10 text-zinc-300 font-medium" id="auth-username">—</span>
+          <button type="button" id="btn-my-offers" class="px-2.5 py-1.5 rounded-lg font-medium text-zinc-300 hover:text-white hover:bg-white/5 transition-colors">Tekliflerim</button>
+          <button type="button" id="btn-admin-panel" class="hidden px-2.5 py-1.5 rounded-lg font-medium text-accent-light hover:bg-accent/10 transition-colors">Admin</button>
+          <button type="button" id="btn-logout" class="px-2.5 py-1.5 rounded-lg font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">Çıkış Yap</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="relative overflow-hidden border-b border-white/5">
+    <div class="absolute inset-0 bg-gradient-to-b from-accent/10 via-transparent to-transparent pointer-events-none"></div>
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-accent/20 rounded-full blur-[120px] pointer-events-none"></div>
+
+    <div class="relative max-w-2xl mx-auto px-5 pt-10 pb-6 sm:pt-14 sm:pb-8 text-center">
+      <!-- Logo -->
+      <a href="#" class="inline-flex items-center gap-3 group" aria-label="biletakas ana sayfa">
+        <span class="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-accent to-violet-700 shadow-glow group-hover:scale-105 transition-transform duration-300">
+          <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+          </svg>
+        </span>
+        <span class="font-display text-3xl sm:text-4xl font-bold tracking-tight">
+          <span class="text-white">bilet</span><span class="text-transparent bg-clip-text bg-gradient-to-r from-accent-light to-accent-glow">akas</span>
+        </span>
+      </a>
+
+      <!-- Top Nav Links -->
+      <nav class="mt-5 flex items-center justify-center gap-1.5 sm:gap-2" aria-label="Üst menü">
+        <a href="#hakkimizda" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">Hakkımızda</a>
+        <a href="#nasil-calisir" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">Nasıl Çalışır?</a>
+        <a href="#kurallar" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-zinc-400 hover:text-white hover:bg-white/5 transition-colors">Kurallar</a>
+      </nav>
+
+      <p class="mt-4 text-zinc-400 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
+        Konser biletlerini güvenle al, sat veya takas et.
+      </p>
+
+      <!-- Search -->
+      <div class="mt-6 max-w-md mx-auto">
+        <label for="search-input" class="sr-only">Sanatçı, konser veya şehir ara</label>
+        <div class="relative">
+          <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            id="search-input"
+            type="search"
+            placeholder="Sanatçı, konser veya şehir ara..."
+            class="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-surface-800 border border-white/10 text-white placeholder-zinc-500 text-sm sm:text-base focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all"
+          />
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-5 py-8 sm:py-10 space-y-10">
+
+    <!-- CTA Buttons -->
+    <section class="space-y-3" aria-label="Ana işlemler">
+      <a href="#listings-heading"
+         class="flex items-center justify-center gap-3 w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-accent to-violet-600 text-white font-semibold text-base sm:text-lg shadow-glow hover:brightness-110 active:scale-[0.98] transition-all duration-200">
+        <svg class="w-5 h-5 shrink-0 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        Gidilmeyen Konserleri Listele
+      </a>
+
+      <button type="button" id="btn-sell"
+         class="flex items-center justify-center gap-3 w-full py-4 px-6 rounded-2xl bg-surface-700 border border-white/10 text-white font-semibold text-base sm:text-lg hover:bg-surface-600 hover:border-white/20 active:scale-[0.98] transition-all duration-200">
+        <svg class="w-5 h-5 shrink-0 text-accent-light" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Gidemeyeceğim Bileti Sat
+      </button>
+    </section>
+
+
+    <!-- Stats + Quick Filters -->
+    <section class="space-y-4" aria-label="Özet ve hızlı filtreler">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="rounded-2xl bg-surface-800 border border-white/5 p-4 text-center">
+          <p class="font-display text-xl font-bold text-white">128</p>
+          <p class="mt-1 text-[11px] uppercase tracking-wide text-zinc-500">Aktif ilan</p>
+        </div>
+        <div class="rounded-2xl bg-surface-800 border border-white/5 p-4 text-center">
+          <p class="font-display text-xl font-bold text-white">2.4K</p>
+          <p class="mt-1 text-[11px] uppercase tracking-wide text-zinc-500">Başarılı işlem</p>
+        </div>
+      </div>
+
+      <div class="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5" aria-label="Hızlı filtreler">
+        <button type="button" class="filter-chip shrink-0 px-3.5 py-2 rounded-full bg-accent text-white text-sm font-semibold" data-filter="">Tümü</button>
+        <button type="button" class="filter-chip shrink-0 px-3.5 py-2 rounded-full bg-surface-800 border border-white/10 text-zinc-300 text-sm font-semibold" data-filter="istanbul">İstanbul</button>
+        <button type="button" class="filter-chip shrink-0 px-3.5 py-2 rounded-full bg-surface-800 border border-white/10 text-zinc-300 text-sm font-semibold" data-filter="ankara">Ankara</button>
+        <button type="button" class="filter-chip shrink-0 px-3.5 py-2 rounded-full bg-surface-800 border border-white/10 text-zinc-300 text-sm font-semibold" data-filter="diğer">Diğer</button>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section id="nasil-calisir" aria-labelledby="how-it-works-heading" class="rounded-2xl bg-surface-800 border border-white/5 p-5 sm:p-6 scroll-mt-6">
+      <h2 id="how-it-works-heading" class="font-display text-lg sm:text-xl font-semibold text-white mb-5">
+        Nasıl Çalışır?
+      </h2>
+      <ol class="space-y-4">
+        <li class="flex gap-4">
+          <span class="flex shrink-0 items-center justify-center w-9 h-9 rounded-xl bg-accent/20 text-accent-light font-display font-bold text-sm">1</span>
+          <div>
+            <p class="font-medium text-white">Bileti bul</p>
+            <p class="mt-0.5 text-sm text-zinc-400 leading-relaxed">Sanatçı, şehir veya tarihe göre arama yaparak uygun ilanı seç.</p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="flex shrink-0 items-center justify-center w-9 h-9 rounded-xl bg-accent/20 text-accent-light font-display font-bold text-sm">2</span>
+          <div>
+            <p class="font-medium text-white">Ödemeyi güvenli havuza yap</p>
+            <p class="mt-0.5 text-sm text-zinc-400 leading-relaxed">Paran satıcıya değil, biletakas güvenli havuz hesabına aktarılır.</p>
+          </div>
+        </li>
+        <li class="flex gap-4">
+          <span class="flex shrink-0 items-center justify-center w-9 h-9 rounded-xl bg-accent/20 text-accent-light font-display font-bold text-sm">3</span>
+          <div>
+            <p class="font-medium text-white">Giriş onaylanınca ödeme satıcıya aktarılır</p>
+            <p class="mt-0.5 text-sm text-zinc-400 leading-relaxed">Konserde girişin onaylandıktan sonra ödeme satıcıya iletilir.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- Listings -->
+    <section aria-labelledby="listings-heading" class="scroll-mt-6">
+      <div class="flex items-center justify-between mb-5">
+        <h2 id="listings-heading" class="font-display text-lg sm:text-xl font-semibold text-white">
+          Güncel İlanlar
+        </h2>
+        <span class="text-xs text-zinc-500 uppercase tracking-wider">Canlı</span>
+      </div>
+
+      <p id="no-results" class="hidden text-center text-sm text-zinc-500 py-8">
+        Aramanıza uygun ilan bulunamadı.
+      </p>
+
+      <div id="listings" class="space-y-3">
+        <p class="text-center text-sm text-zinc-500 py-8">İlanlar yükleniyor…</p>
+      </div>
+    </section>
+  </main>
+
+
+    <!-- Trust Note -->
+    <section class="max-w-2xl mx-auto px-5 pb-4">
+      <div class="rounded-2xl bg-gradient-to-br from-emerald-500/10 to-accent/10 border border-emerald-500/20 p-5">
+        <div class="flex gap-3">
+          <span class="flex shrink-0 items-center justify-center w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 11c0-1.105.895-2 2-2s2 .895 2 2-.895 2-2 2-2-.895-2-2z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            </svg>
+          </span>
+          <div>
+            <h2 class="font-display text-base font-semibold text-white">Instagram DM yerine güvenli akış</h2>
+            <p class="mt-1 text-sm text-zinc-400 leading-relaxed">
+              Ödeme satıcıya doğrudan gitmez. Sorun bildirilirse işlem durur; kanıt incelendikten sonra iade veya aktarım yapılır.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  <!-- Hakkımızda -->
+  <section id="hakkimizda" aria-labelledby="hakkimizda-heading" class="scroll-mt-6 border-t border-white/5">
+    <div class="max-w-2xl mx-auto px-5 py-12">
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/15 text-accent-light text-xs font-semibold mb-3">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        Hakkımızda
+      </span>
+      <h2 id="hakkimizda-heading" class="font-display text-2xl sm:text-3xl font-bold text-white mb-4">
+        Biz kimiz?
+      </h2>
+      <p class="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-xl">
+        Biletakas, Türkiye’de konser ve etkinlik biletlerini güvenli şekilde devretmek isteyen kullanıcıları buluşturan topluluk odaklı bir platformdur.
+      </p>
+      <p class="mt-3 text-sm sm:text-base text-zinc-400 leading-relaxed max-w-xl">
+        Amacımız, Instagram DM ve dağınık ilanlar yerine daha şeffaf, güvenli ve düzenli bir ikinci el bilet deneyimi sunmaktır. 
+      </p>
+    </div>
+  </section>
+
+  <!-- Kurallar -->
+  <section id="kurallar" aria-labelledby="kurallar-heading" class="scroll-mt-6 border-t border-white/5 bg-surface-800/40">
+    <div class="max-w-2xl mx-auto px-5 py-12">
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/15 text-accent-light text-xs font-semibold mb-3">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        Kurallar
+      </span>
+      <h2 id="kurallar-heading" class="font-display text-2xl sm:text-3xl font-bold text-white mb-6">
+        Platform kuralları
+      </h2>
+      <ul class="space-y-4">
+        <li class="flex gap-3">
+          <span class="flex shrink-0 items-center justify-center w-8 h-8 rounded-lg bg-accent/20 text-accent-light">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </span>
+          <p class="text-sm sm:text-base text-zinc-400 leading-relaxed pt-1">Ödemeler her zaman güvenli havuz üzerinden yapılır; satıcıya doğrudan para gönderilmez.</p>
+        </li>
+        <li class="flex gap-3">
+          <span class="flex shrink-0 items-center justify-center w-8 h-8 rounded-lg bg-accent/20 text-accent-light">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </span>
+          <p class="text-sm sm:text-base text-zinc-400 leading-relaxed pt-1">Sahte veya yanıltıcı bilet ilanı paylaşan hesaplar kalıcı olarak platformdan uzaklaştırılır.</p>
+        </li>
+        <li class="flex gap-3">
+          <span class="flex shrink-0 items-center justify-center w-8 h-8 rounded-lg bg-accent/20 text-accent-light">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </span>
+          <p class="text-sm sm:text-base text-zinc-400 leading-relaxed pt-1">Bilet fiyatları liste fiyatının çok üzerinde belirlenemez; aşırı fiyatlandırma bildirilebilir.</p>
+        </li>
+        <li class="flex gap-3">
+          <span class="flex shrink-0 items-center justify-center w-8 h-8 rounded-lg bg-accent/20 text-accent-light">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          </span>
+          <p class="text-sm sm:text-base text-zinc-400 leading-relaxed pt-1">Sorun bildirildiğinde işlem durdurulur; kanıtlar incelendikten sonra iade veya aktarım yapılır.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Sık Sorulan Sorular -->
+  <section id="sss" aria-labelledby="sss-heading" class="scroll-mt-6 border-t border-white/5">
+    <div class="max-w-2xl mx-auto px-5 py-12">
+      <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/15 text-accent-light text-xs font-semibold mb-3">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        SSS
+      </span>
+      <h2 id="sss-heading" class="font-display text-2xl sm:text-3xl font-bold text-white mb-6">
+        Sık Sorulan Sorular
+      </h2>
+      <div class="space-y-3">
+        <details class="group rounded-2xl bg-surface-800 border border-white/5 p-4 open:border-accent/25 transition-colors">
+          <summary class="flex items-center justify-between gap-3 cursor-pointer list-none font-medium text-white text-sm sm:text-base">
+            Ödemem satıcıya direkt gidiyor mu?
+            <svg class="w-4 h-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          </summary>
+          <p class="mt-3 text-sm text-zinc-400 leading-relaxed">Hayır. Ödemeniz önce biletakas güvenli havuz hesabına aktarılır; giriş onaylandıktan sonra satıcıya iletilir.</p>
+        </details>
+        <details class="group rounded-2xl bg-surface-800 border border-white/5 p-4 open:border-accent/25 transition-colors">
+          <summary class="flex items-center justify-between gap-3 cursor-pointer list-none font-medium text-white text-sm sm:text-base">
+            Bilet sahte çıkarsa ne olur?
+            <svg class="w-4 h-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          </summary>
+          <p class="mt-3 text-sm text-zinc-400 leading-relaxed">Girişte sorun yaşarsanız işlemi yaşadığınız problemi kaydedin(kapıda okumadığına dair fotoğraf vs) ve bildirin. Kanıtlar incelenir ve haklı bulunmanız durumunda ödemeniz iade edilir.</p>
+        </details>
+        <details class="group rounded-2xl bg-surface-800 border border-white/5 p-4 open:border-accent/25 transition-colors">
+          <summary class="flex items-center justify-between gap-3 cursor-pointer list-none font-medium text-white text-sm sm:text-base">
+            Bilet satmak için ücret ödüyor muyum?
+            <svg class="w-4 h-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          </summary>
+          <p class="mt-3 text-sm text-zinc-400 leading-relaxed">İlan vermek ücretsizdir. Satış gerçekleştiğinde %5 hizmet bedeli + havale ücreti kesilir; tutar ilan sırasında gösterilir.</p>
+        </details>
+        <details class="group rounded-2xl bg-surface-800 border border-white/5 p-4 open:border-accent/25 transition-colors">
+          <summary class="flex items-center justify-between gap-3 cursor-pointer list-none font-medium text-white text-sm sm:text-base">
+            Teklif verdiğim bilet için ne zaman ödeme yapıyorum?
+            <svg class="w-4 h-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          </summary>
+          <p class="mt-3 text-sm text-zinc-400 leading-relaxed">Teklifiniz satıcı tarafından onaylandıktan sonra ödeme adımına yönlendirilirsiniz; onay öncesi herhangi bir tahsilat yapılmaz.</p>
+        </details>
+        <details class="group rounded-2xl bg-surface-800 border border-white/5 p-4 open:border-accent/25 transition-colors">
+  <summary class="flex items-center justify-between gap-3 cursor-pointer list-none font-medium text-white text-sm sm:text-base">
+    Bileti aldığım kişinin güvenilir olup olmadığını nasıl anlayacağım?
+    <svg class="w-4 h-4 shrink-0 text-zinc-500 transition-transform group-open:rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+    </svg>
+  </summary>
+
+  <div class="mt-3 space-y-3 text-sm text-zinc-400 leading-relaxed">
+
+    <p>
+      biletakas'ta hiçbir kullanıcı yalnızca hesap oluşturarak güvenilir satıcı olarak görünmez.
+      Her satıcı profili farklı güven katmanları içerir.
+    </p>
+
+    <ul class="space-y-2">
+      <li>✅ Telefon doğrulandı</li>
+      <li>✅ E-posta doğrulandı</li>
+      <li>✅ Instagram doğrulandı </li>
+      <li>🏅 Topluluk Üyesi <span class="text-zinc-500">(Platform tarafından güvenilirliği doğrulanmış sınırlı sayıdaki kullanıcılara verilen özel rozet.)</span></li>
+      <li>🎟️ Başarılı satış sayısı</li>
+      <li>🛒 Başarılı alış sayısı</li>
+      <li>⭐ Kullanıcı puanı ve değerlendirmeleri</li>
+      <li>🛡️ Sorunsuz işlem geçmişi</li>
+    </ul>
+
+    <p>
+      Ayrıca ödemeniz hiçbir zaman doğrudan satıcıya gönderilmez.
+      Para, etkinliğe sorunsuz giriş yaptığınız doğrulanana kadar
+      <span class="text-white font-medium">biletakas Güvenli Havuz Sistemi</span>'nde bekletilir.
+      Bir sorun yaşanması halinde işlem durdurulur ve kanıtlar incelendikten sonra gerekli karar verilir.
+    </p>
+
+    <p class="text-zinc-500">
+      Hiçbir doğrulama sistemi tek başına %100 güvence sağlayamaz.
+      biletakas'ın amacı; çok katmanlı doğrulama sistemi ve Güvenli Havuz altyapısıyla
+      Instagram dm ya da farklı satış platformlarında sürekli gerçekleşmekte olan dolandırıcılık riskini mümkün olan en düşük seviyeye indirmektir.
+    </p>
+
+  </div>
+</details>
+      </div>
+    </div>
+  </section>
+
+  <footer class="max-w-2xl mx-auto px-5 py-8 text-center text-xs text-zinc-600 border-t border-white/5">
+    <p>&copy; 2026 biletakas — Tüm hakları saklıdır.</p>
+  </footer>
+
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-surface-900/90 backdrop-blur-lg sm:hidden" aria-label="Alt menü">
+    <div class="max-w-2xl mx-auto grid grid-cols-4 px-3 py-2 text-xs">
+      <a href="#" class="flex flex-col items-center gap-1 text-accent-light font-medium">
+        <span>⌂</span><span>Ana</span>
+      </a>
+      <a href="#listings-heading" class="flex flex-col items-center gap-1 text-zinc-500">
+        <span>⌕</span><span>Ara</span>
+      </a>
+      <button type="button" id="btn-sell-mobile" class="flex flex-col items-center gap-1 text-zinc-500">
+        <span>＋</span><span>Sat</span>
+      </button>
+      <a href="#" class="flex flex-col items-center gap-1 text-zinc-500">
+        <span>♡</span><span>Favori</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Offer Modal -->
+  <div id="offer-modal" class="hidden fixed inset-0 z-50" aria-hidden="true">
+    <div id="offer-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative flex min-h-full items-end sm:items-center justify-center p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="offer-modal-title" class="w-full max-w-md rounded-2xl bg-surface-800 border border-white/10 shadow-glow p-5 sm:p-6">
+        <div class="flex items-start justify-between gap-3 mb-5">
+          <div>
+            <h3 id="offer-modal-title" class="font-display text-lg font-semibold text-white">Teklif Ver</h3>
+            <p id="offer-modal-subtitle" class="mt-1 text-sm text-zinc-400"></p>
+          </div>
+          <button type="button" id="offer-close" class="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label="Kapat">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form id="offer-form">
+          <label for="offer-amount" class="block text-sm font-medium text-zinc-300 mb-2">Teklif Tutarı (₺)</label>
+          <div class="relative">
+            <span class="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">₺</span>
+            <input
+              id="offer-amount"
+              type="number"
+              min="1"
+              step="1"
+              required
+              placeholder="0"
+              class="w-full pl-10 pr-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all"
+            />
+          </div>
+          <p id="offer-list-price" class="mt-2 text-xs text-zinc-500"></p>
+
+          <div class="mt-5 flex gap-2">
+            <button type="button" id="offer-cancel" class="flex-1 py-2.5 px-4 rounded-xl bg-surface-700 border border-white/10 text-white text-sm font-semibold hover:bg-surface-600 transition-all">
+              İptal
+            </button>
+            <button type="submit" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-accent to-violet-600 text-white text-sm font-semibold hover:brightness-110 transition-all">
+              Teklifi Gönder
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login / Register Modal -->
+  <div id="login-modal" class="hidden fixed inset-0 z-50" aria-hidden="true">
+    <div id="login-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative flex min-h-full items-end sm:items-center justify-center p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="login-modal-title" class="w-full max-w-md rounded-2xl bg-surface-800 border border-white/10 shadow-glow p-5 sm:p-6">
+        <div class="flex items-start justify-between gap-3 mb-5">
+          <div>
+            <h3 id="login-modal-title" class="font-display text-lg font-semibold text-white">Giriş Yap</h3>
+            <p class="mt-1 text-sm text-zinc-400">Teklif verebilmek ve ilan oluşturabilmek için giriş yapmalısın.</p>
+          </div>
+          <button type="button" id="login-close" class="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label="Kapat">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <p id="login-error" class="hidden mb-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm"></p>
+
+        <form id="login-form" data-mode="login">
+          <label for="login-email" class="block text-sm font-medium text-zinc-300 mb-2">E-posta</label>
+          <input id="login-email" type="email" required autocomplete="email" placeholder="ornek@eposta.com"
+            class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all mb-4" />
+
+          <label for="login-password" class="block text-sm font-medium text-zinc-300 mb-2">Şifre</label>
+          <input id="login-password" type="password" required minlength="6" autocomplete="current-password" placeholder="••••••••"
+            class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all" />
+
+          <button type="submit" id="login-submit"
+            class="mt-5 w-full py-3 rounded-xl bg-gradient-to-r from-accent to-violet-600 text-white text-sm font-semibold hover:brightness-110 active:scale-[0.98] transition-all">
+            Giriş Yap
+          </button>
+
+          <p class="mt-4 text-center text-sm text-zinc-500">
+            <span id="login-switch-text">Hesabın yok mu?</span>
+            <button type="button" id="login-switch-btn" class="text-accent-light font-medium hover:underline">Kayıt ol</button>
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sell (İlan Oluşturma) Modal -->
+  <div id="sell-modal" class="hidden fixed inset-0 z-50" aria-hidden="true">
+    <div id="sell-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative flex min-h-full items-end sm:items-center justify-center p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="sell-modal-title" class="w-full max-w-lg rounded-2xl bg-surface-800 border border-white/10 shadow-glow p-5 sm:p-6 max-h-[88vh] overflow-y-auto">
+        <div class="flex items-start justify-between gap-3 mb-5">
+          <div>
+            <h3 id="sell-modal-title" class="font-display text-lg font-semibold text-white">Bilet Sat</h3>
+            <p class="mt-1 text-sm text-zinc-400">İlanın, yönetici onayından sonra ana sayfada yayınlanır.</p>
+          </div>
+          <button type="button" id="sell-close" class="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label="Kapat">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <p id="sell-error" class="hidden mb-4 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm"></p>
+
+        <form id="sell-form" class="space-y-4">
+          <div>
+            <label for="sell-artist" class="block text-sm font-medium text-zinc-300 mb-2">Sanatçı / Etkinlik adı</label>
+            <input id="sell-artist" type="text" required placeholder="Örn. Tarkan"
+              class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all" />
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="sell-venue" class="block text-sm font-medium text-zinc-300 mb-2">Mekan</label>
+              <input id="sell-venue" type="text" required placeholder="Örn. Vodafone Park"
+                class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all" />
+            </div>
+            <div>
+              <label for="sell-city" class="block text-sm font-medium text-zinc-300 mb-2">Şehir</label>
+              <input id="sell-city" type="text" required placeholder="Örn. İstanbul"
+                class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="sell-date" class="block text-sm font-medium text-zinc-300 mb-2">Tarih ve saat</label>
+              <input id="sell-date" type="datetime-local" required
+                class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all [color-scheme:dark]" />
+            </div>
+            <div>
+              <label for="sell-ticket-type" class="block text-sm font-medium text-zinc-300 mb-2">Bilet tipi</label>
+              <select id="sell-ticket-type" required
+                class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all">
+                <option value="">Seçiniz</option>
+                <option value="Genel">Genel</option>
+                <option value="Ön Sıra">Ön Sıra</option>
+                <option value="VIP">VIP</option>
+                <option value="Yanyana">Yanyana</option>
+                <option value="Diğer">Diğer</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="sell-quantity" class="block text-sm font-medium text-zinc-300 mb-2">Bilet adedi</label>
+              <input id="sell-quantity" type="number" min="1" step="1" required placeholder="1"
+                class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all" />
+            </div>
+            <div>
+              <label for="sell-price" class="block text-sm font-medium text-zinc-300 mb-2">Fiyat (₺, bilet başına)</label>
+              <input id="sell-price" type="number" min="1" step="1" required placeholder="0"
+                class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all" />
+            </div>
+          </div>
+
+          <div>
+            <label for="sell-description" class="block text-sm font-medium text-zinc-300 mb-2">Açıklama</label>
+            <textarea id="sell-description" rows="3" placeholder="Bilet hakkında ek bilgi (koltuk, blok, teslim şekli vb.)"
+              class="w-full px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/20 transition-all resize-none"></textarea>
+          </div>
+
+          <div class="flex gap-2 pt-1">
+            <button type="button" id="sell-cancel" class="flex-1 py-2.5 px-4 rounded-xl bg-surface-700 border border-white/10 text-white text-sm font-semibold hover:bg-surface-600 transition-all">
+              İptal
+            </button>
+            <button type="submit" id="sell-submit" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-accent to-violet-600 text-white text-sm font-semibold hover:brightness-110 transition-all">
+              İlanı Gönder
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tekliflerim Modal (satıcının aldığı teklifler) -->
+  <div id="my-offers-modal" class="hidden fixed inset-0 z-50" aria-hidden="true">
+    <div id="my-offers-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative flex min-h-full items-end sm:items-center justify-center p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="my-offers-modal-title" class="w-full max-w-lg rounded-2xl bg-surface-800 border border-white/10 shadow-glow p-5 sm:p-6 max-h-[85vh] overflow-y-auto">
+        <div class="flex items-start justify-between gap-3 mb-5">
+          <div>
+            <h3 id="my-offers-modal-title" class="font-display text-lg font-semibold text-white">Tekliflerim</h3>
+            <p class="mt-1 text-sm text-zinc-400">İlanlarına gelen teklifleri buradan yönetebilirsin.</p>
+          </div>
+          <button type="button" id="my-offers-close" class="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label="Kapat">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div id="my-offers-list" class="space-y-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Panel Modal -->
+  <div id="admin-modal" class="hidden fixed inset-0 z-50" aria-hidden="true">
+    <div id="admin-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="relative flex min-h-full items-end sm:items-center justify-center p-4">
+      <div role="dialog" aria-modal="true" aria-labelledby="admin-modal-title" class="w-full max-w-lg rounded-2xl bg-surface-800 border border-white/10 shadow-glow p-5 sm:p-6 max-h-[85vh] overflow-y-auto">
+        <div class="flex items-start justify-between gap-3 mb-5">
+          <div>
+            <h3 id="admin-modal-title" class="font-display text-lg font-semibold text-white">Admin Panel</h3>
+            <p class="mt-1 text-sm text-zinc-400">Onay bekleyen ilanları incele.</p>
+          </div>
+          <button type="button" id="admin-close" class="shrink-0 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors" aria-label="Kapat">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div id="admin-pending-list" class="space-y-3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] max-w-sm w-[calc(100%-2rem)] px-4 py-3 rounded-xl bg-surface-700 border border-white/10 text-sm text-white shadow-card text-center" role="status"></div>
+
+  <!-- App Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/listings.js"></script>
+  <script src="js/offers.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/main.js"></script>
+
+</body>
+</html>
