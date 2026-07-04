@@ -36,6 +36,7 @@ async function initAdminPage() {
 
   statusEl.textContent = 'Admin olarak giriş yapıldı. Bekleyen ilanlar yükleniyor...';
   await loadPendingListings();
+  await loadAdminOffers();
 }
 
 async function loadPendingListings() {
@@ -107,13 +108,21 @@ function createListingHtml(l) {
 }
 
 async function updateListingStatus(id, status) {
-  const res = await sb
+  const { data, error } = await sb
     .from('listings')
     .update({ status })
-    .eq('id', id);
+    .eq('id', id)
+    .select();
 
-  if (res.error) {
-    alert('İşlem başarısız: ' + res.error.message);
+  console.log('UPDATE RESULT:', { data, error });
+
+  if (error) {
+    alert('İşlem başarısız: ' + error.message);
+    return;
+  }
+
+  if (!data || data.length === 0) {
+    alert('İşlem başarısız: Kayıt güncellenmedi. RLS/policy engelliyor olabilir.');
     return;
   }
 
@@ -143,3 +152,4 @@ async function loadAdminOffers() {
 
   console.log('OFFERS:', { data, error });
 }
+
