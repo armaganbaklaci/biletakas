@@ -3,19 +3,24 @@
 // ============================================================
 
 var _allListings = []; // ekranda gösterilen aktif ilanların önbelleği
+const EVENT_GRACE_HOURS = 4;
 
 /* ---------- Veri çekme ---------- */
 async function fetchActiveListings() {
   if (!sb) return [];
 
-  var nowIso = new Date().toISOString();
 
-  var res = await sb
-    .from('listings')
-    .select('*, seller:profiles(username, display_name, email_verified, phone_verified, instagram_verified, admin_verified, sales_count, purchase_count)')
-    .eq('status', 'active')
-    .gte('event_datetime', nowIso)
-    .order('event_datetime', { ascending: true });
+ // Etkinlikten sonraki 8 saate kadar ilanlar görünmeye devam etsin
+const cutoffIso = new Date(
+  Date.now() - EVENT_GRACE_HOURS * 60 * 60 * 1000
+).toISOString();
+
+var res = await sb
+  .from('listings')
+  .select('*, seller:profiles(username, display_name, email_verified, phone_verified, instagram_verified, admin_verified, sales_count, purchase_count)')
+  .eq('status', 'active')
+  .gte('event_datetime', cutoffIso)
+  .order('event_datetime', { ascending: true });
 
   if (res.error) {
     console.error('[biletakas] İlanlar çekilemedi:', res.error);
@@ -281,8 +286,18 @@ function wireListingsUI() {
         description: document.getElementById('sell-description').value.trim(),
       };
 
-      if (!formData.artist || !formData.venue || !formData.city || !formData.eventDatetime || !formData.ticketType || !formData.quantity || !formData.price) {
+        if (!formData.artist || !formData.venue || !formData.city || !formData.eventDatetime || !formData.ticketType || !formData.quantity || !formData.price) {
         errorEl.textContent = 'Lütfen tüm zorunlu alanları doldurun.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      const cutoffTime = new Date(
+        Date.now() - EVENT_GRACE_HOURS * 60 * 60 * 1000
+      );
+
+      if (new Date(formData.eventDatetime) < cutoffTime) {
+        errorEl.textContent = 'Bu etkinlik için ilan verme süresi dolmuş.';
         errorEl.classList.remove('hidden');
         return;
       }
