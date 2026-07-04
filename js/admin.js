@@ -1,168 +1,136 @@
 // ============================================================
-// biletakas — Admin Panel
+// biletakas — Admin Page
 // ============================================================
 
-async function isCurrentUserAdmin() {
-  if (!sb || !AppState.user) return false;
+document.addEventListener('DOMContentLoaded', initAdminPage);
 
-  var res = await sb
-    .from('profiles')
-    .select('is_admin, admin_verified')
-    .eq('id', AppState.user.id)
-    .single();
+async function initAdminPage() {
+  const statusEl = document.getElementById('admin-status');
+  const listEl = document.getElementById('admin-pending-list');
 
-  if (res.error || !res.data) {
-    console.error('[biletakas] Admin kontrolü yapılamadı:', res.error);
-    return false;
+  if (!statusEl || !listEl) return;
+
+  if (!sb) {
+    statusEl.textContent = 'Supabase bağlantısı yok.';
+    return;
   }
 
-  AppState.profile = Object.assign({}, AppState.profile || {}, res.data);
+  const userRes = await sb.auth.getUser();
+  const user = userRes.data.user;
 
-  return !!res.data.is_admin;
+  if (!user) {
+    statusEl.textContent = 'Admin paneli için giriş yapmalısınız.';
+    return;
+  }
+
+  const profileRes = await sb
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single();
+
+  if (profileRes.error || !profileRes.data || !profileRes.data.is_admin) {
+    statusEl.textContent = 'Bu sayfaya erişim yetkiniz yok.';
+    return;
+  }
+
+  statusEl.textContent = 'Admin olarak giriş yapıldı. Bekleyen ilanlar yükleniyor...';
+  await loadPendingListings();
 }
 
-async function fetchPendingListings() {
-  if (!sb) return [];
+async function loadPendingListings() {
+  const statusEl = document.getElementById('admin-status');
+  const listEl = document.getElementById('admin-pending-list');
 
-  var res = await sb
+  const res = await sb
     .from('listings')
     .select('*, seller:profiles(username, display_name)')
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
 
   if (res.error) {
-    console.error('[biletakas] Bekleyen ilanlar çekilemedi:', res.error);
-    showToast('Bekleyen ilanlar yüklenemedi.');
-    return [];
-  }
-
-  return res.data || [];
-}
-
-function renderPendingListings(listings) {
-  var container = document.getElementById('admin-pending-list');
-  if (!container) return;
-
-  if (!listings || listings.length === 0) {
-    container.innerHTML = '<p class="text-center text-sm text-zinc-500 py-8">Onay bekleyen ilan yok.</p>';
+    console.error(res.error);
+    statusEl.textContent = 'Bekleyen ilanlar yüklenemedi.';
     return;
   }
 
-  container.innerHTML = listings.map(function (l) {
-    var seller = l.seller || {};
-    var sellerName = escapeHtml(seller.display_name || seller.username || 'Kullanıcı');
+  const listings = res.data || [];
 
-    return (
-      '<div class="rounded-xl bg-surface-700/60 border border-white/5 p-3.5">' +
-        '<div class="flex items-start justify-between gap-2">' +
-          '<div>' +
-            '<p class="text-sm font-semibold text-white">' + escapeHtml(l.artist) + '</p>' +
-            '<p class="text-xs text-zinc-500 mt-0.5">' + escapeHtml(l.venue) + ' · ' + escapeHtml(l.city) + '</p>' +
-            '<p class="text-xs text-zinc-500">' + formatEventDate(l.event_datetime) + '</p>' +
-            '<p class="text-xs text-zinc-500 mt-1">İlan sahibi: ' + sellerName + '</p>' +
-            '<p class="text-xs text-zinc-500 mt-1">' + Number(l.quantity || 1) + ' bilet · ' + escapeHtml(l.ticket_type || '-') + '</p>' +
-          '</div>' +
-          '<p class="text-lg font-bold text-white shrink-0">' + formatPrice(l.price) + '</p>' +
-        '</div>' +
+  statusEl.textContent = `${listings.length} bekleyen ilan var.`;
 
-        (l.description ? '<p class="mt-2 text-xs text-zinc-500 leading-relaxed">' + escapeHtml(l.description) + '</p>' : '') +
-
-        '<div class="mt-3 flex gap-2">' +
-          '<button type="button" class="btn-admin-approve flex-1 py-2 rounded-lg bg-emerald-600/90 text-white text-xs font-semibold hover:bg-emerald-600 transition-all" data-listing-id="' + l.id + '">Onayla</button>' +
-          '<button type="button" class="btn-admin-reject flex-1 py-2 rounded-lg bg-surface-700 border border-white/10 text-white text-xs font-semibold hover:bg-surface-600 transition-all" data-listing-id="' + l.id + '">Reddet</button>' +
-        '</div>' +
-      '</div>'
-    );
-  }).join('');
-
-  container.querySelectorAll('.btn-admin-approve').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      handleListingDecision(btn.getAttribute('data-listing-id'), 'active');
-    });
-  });
-
-  container.querySelectorAll('.btn-admin-reject').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      handleListingDecision(btn.getAttribute('data-listing-id'), 'rejected');
-    });
-  });
-}
-
-async function handleListingDecision(listingId, newStatus) {
-  if (!sb) return;
-
-  var adminOk = await isCurrentUserAdmin();
-  if (!adminOk) {
-    showToast('Bu işlem için admin yetkisi gerekli.');
+  if (listings.length === 0) {
+    listEl.innerHTML = '<p class="text-zinc-500">Onay bekleyen ilan yok.</p>';
     return;
   }
 
-  var res = await sb
+  listEl.innerHTML = listings.map(createListingHtml).join('');
+
+  document.querySelectorAll('.btn-approve').forEach((btn) => {
+    btn.addEventListener('click', () => updateListingStatus(btn.dataset.id, 'active'));
+  });
+
+  document.querySelectorAll('.btn-reject').forEach((btn) => {
+    btn.addEventListener('click', () => updateListingStatus(btn.dataset.id, 'rejected'));
+  });
+}
+
+function createListingHtml(l) {
+  const seller = l.seller || {};
+  const sellerName = seller.display_name || seller.username || 'Kullanıcı';
+
+  return `
+    <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
+      <div class="flex justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold">${esc(l.artist)}</h2>
+          <p class="text-sm text-zinc-400">${esc(l.venue)} · ${esc(l.city)}</p>
+          <p class="text-sm text-zinc-400">${formatDate(l.event_datetime)}</p>
+          <p class="text-sm text-zinc-400">Satıcı: ${esc(sellerName)}</p>
+          <p class="text-sm text-zinc-400">${Number(l.quantity || 1)} bilet · ${esc(l.ticket_type || '-')}</p>
+          ${l.description ? `<p class="text-sm text-zinc-500 mt-2">${esc(l.description)}</p>` : ''}
+        </div>
+
+        <div class="text-right">
+          <p class="text-xl font-bold">${Number(l.price || 0).toLocaleString('tr-TR')} TL</p>
+          <div class="flex gap-2 mt-4">
+            <button class="btn-approve px-3 py-2 rounded-lg bg-emerald-600 text-sm font-semibold" data-id="${l.id}">
+              Onayla
+            </button>
+            <button class="btn-reject px-3 py-2 rounded-lg bg-red-600 text-sm font-semibold" data-id="${l.id}">
+              Reddet
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function updateListingStatus(id, status) {
+  const res = await sb
     .from('listings')
-    .update({ status: newStatus })
-    .eq('id', listingId);
+    .update({ status })
+    .eq('id', id);
 
   if (res.error) {
-    console.error('[biletakas] İlan durumu güncellenemedi:', res.error);
-    showToast('İşlem başarısız oldu.');
+    alert('İşlem başarısız: ' + res.error.message);
     return;
   }
 
-  showToast(newStatus === 'active' ? 'İlan onaylandı.' : 'İlan reddedildi.');
-
-  var pending = await fetchPendingListings();
-  renderPendingListings(pending);
-
-  if (newStatus === 'active' && typeof loadAndRenderListings === 'function') {
-    loadAndRenderListings();
-  }
+  alert(status === 'active' ? 'İlan onaylandı.' : 'İlan reddedildi.');
+  await loadPendingListings();
 }
 
-async function openAdminModal() {
-  var adminOk = await isCurrentUserAdmin();
-
-  if (!adminOk) {
-    showToast('Bu bölüm sadece yöneticiler içindir.');
-    return;
-  }
-
-  var modal = document.getElementById('admin-modal');
-  var list = document.getElementById('admin-pending-list');
-
-  if (list) {
-    list.innerHTML = '<p class="text-center text-sm text-zinc-500 py-8">Yükleniyor…</p>';
-  }
-
-  openModalEl(modal);
-
-  var pending = await fetchPendingListings();
-  renderPendingListings(pending);
+function esc(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
 }
 
-function closeAdminModal() {
-  var modal = document.getElementById('admin-modal');
-  closeModalEl(modal);
-}
-
-function wireAdminUI() {
-  var btnOpen = document.getElementById('btn-admin-panel');
-  var btnClose = document.getElementById('admin-close');
-  var backdrop = document.getElementById('admin-backdrop');
-
-  if (btnOpen) {
-    btnOpen.addEventListener('click', function (e) {
-      e.preventDefault();
-      openAdminModal();
-    });
-  }
-
-  if (btnClose) btnClose.addEventListener('click', closeAdminModal);
-  if (backdrop) backdrop.addEventListener('click', closeAdminModal);
-
-  document.addEventListener('keydown', function (e) {
-    var modal = document.getElementById('admin-modal');
-    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
-      closeAdminModal();
-    }
-  });
+function formatDate(value) {
+  if (!value) return '-';
+  return new Date(value).toLocaleString('tr-TR');
 }
