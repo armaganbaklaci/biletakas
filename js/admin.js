@@ -145,11 +145,57 @@ function formatDate(value) {
 }
 
 async function loadAdminOffers() {
+  const offersEl = document.getElementById('admin-offers-list');
+  if (!offersEl) return;
+
   const { data, error } = await sb
     .from('offers')
-    .select('*')
+    .select(`
+      *,
+      listing:listings(artist, venue, city, price, seller_id),
+      buyer:profiles(username, display_name)
+    `)
     .order('created_at', { ascending: false });
 
   console.log('OFFERS:', { data, error });
+
+  if (error) {
+    offersEl.innerHTML = '<p class="text-red-400">Teklifler yüklenemedi.</p>';
+    return;
+  }
+
+  const offers = data || [];
+
+  if (offers.length === 0) {
+    offersEl.innerHTML = '<p class="text-zinc-500">Henüz teklif yok.</p>';
+    return;
+  }
+
+  offersEl.innerHTML = offers.map(createOfferHtml).join('');
 }
 
+
+function createOfferHtml(o) {
+  const listing = o.listing || {};
+  const buyer = o.buyer || {};
+  const buyerName = buyer.display_name || buyer.username || 'Kullanıcı';
+
+  return `
+    <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
+      <div class="flex justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-bold">${esc(listing.artist || 'İlan')}</h3>
+          <p class="text-sm text-zinc-400">${esc(listing.venue || '-')} · ${esc(listing.city || '-')}</p>
+          <p class="text-sm text-zinc-400">Alıcı: ${esc(buyerName)}</p>
+          <p class="text-sm text-zinc-400">Durum: ${esc(o.status)}</p>
+          <p class="text-sm text-zinc-500 mt-2">${formatDate(o.created_at)}</p>
+        </div>
+
+        <div class="text-right">
+          <p class="text-xl font-bold">${Number(o.amount || 0).toLocaleString('tr-TR')} TL</p>
+          <p class="text-sm text-zinc-500">İlan fiyatı: ${Number(listing.price || 0).toLocaleString('tr-TR')} TL</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
