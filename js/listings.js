@@ -221,9 +221,9 @@ async function submitNewListing(formData) {
   console.log("AppState.user =", AppState.user);
   console.log("seller_id =", AppState.user?.id);
 
-  var res = await sb.from('listings').insert(payload).select().single();
+  var res = await sb.from('listings').insert(payload);
   if (res.error) throw res.error;
-  return res.data;
+  return true;
 }
 
 function wireListingsUI() {
