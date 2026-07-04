@@ -271,7 +271,7 @@ function createUserHtml(u) {
 }
 
 async function toggleUserField(id, field, value) {
-  if (!['admin_verified', 'is_admin'].includes(field)) return;
+  if (field !== 'admin_verified') return;
 
   const { data, error } = await sb
     .from('profiles')
@@ -286,7 +286,7 @@ async function toggleUserField(id, field, value) {
   }
 
   const targetName = data.display_name || data.username || data.id;
-  const fieldName = field === 'is_admin' ? 'admin yetkisi' : 'admin onayı';
+  const fieldName = 'admin onayı';
   await addLog('user_update', `${targetName} için ${fieldName} ${value ? 'açıldı' : 'kapatıldı'}.`, {
     target_user_id: id,
     field,
@@ -382,7 +382,6 @@ function createHistoryHtml(l) {
 // Logs
 // ------------------------------------------------------------
 async function loadAdminLogs() {
-  console.log("LOAD ADMIN LOGS ÇALIŞTI");
   const el = document.getElementById('admin-logs-list');
   if (!el) return;
 
@@ -391,13 +390,11 @@ async function loadAdminLogs() {
     .select('*')
     .order('created_at', { ascending: false })
     .limit(200);
-    console.log("DATA:", data);
-    console.log("ERROR:", error);
-    console.dir(error);
+
 
   if (error) {
     console.warn(error);
-    el.innerHTML = '<p class="text-zinc-500">İşlem geçmişi için admin_logs tablosunu SQL ile eklemelisin.</p>';
+    el.innerHTML = '<p class="text-zinc-500">İşlem geçmişi yüklenemedi.</p>';
     return;
   }
 
@@ -439,15 +436,31 @@ function renderLogs() {
 
 function createLogHtml(log) {
   const adminName = 'Admin';
+
+  function actionBadge(action) {
+    switch (action) {
+      case "offer_status_update":
+        return '<span class="px-2 py-1 rounded-md bg-emerald-500/15 text-emerald-300 text-xs font-semibold">Teklif</span>';
+      case "listing_status_update":
+        return '<span class="px-2 py-1 rounded-md bg-sky-500/15 text-sky-300 text-xs font-semibold">İlan</span>';
+      case "user_update":
+        return '<span class="px-2 py-1 rounded-md bg-purple-500/15 text-purple-300 text-xs font-semibold">Kullanıcı</span>';
+      default:
+        return '<span class="px-2 py-1 rounded-md bg-zinc-700 text-zinc-300 text-xs">Diğer</span>';
+    }
+  }
+
   return `
     <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
-      <div class="flex flex-col md:flex-row md:justify-between gap-2">
+      <div class="flex flex-col md:flex-row md:justify-between gap-3">
         <div>
-          <p class="font-semibold">${esc(adminName)}</p>
+          <div class="flex items-center gap-2 mb-1">
+            <p class="font-semibold">${esc(adminName)}</p>
+            ${actionBadge(log.action)}
+          </div>
           <p class="text-sm text-zinc-300">${esc(log.message || log.action || '-')}</p>
-          <p class="text-xs text-zinc-500 mt-1">${esc(log.action || '-')}</p>
+          <p class="text-xs text-zinc-500 mt-2">${formatDate(log.created_at)}</p>
         </div>
-        <p class="text-sm text-zinc-500">${formatDate(log.created_at)}</p>
       </div>
     </div>
   `;
