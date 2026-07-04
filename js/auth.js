@@ -132,7 +132,7 @@ function updateAuthUI() {
     if (loggedOutEl) loggedOutEl.classList.add('hidden');
     if (loggedInEl) loggedInEl.classList.remove('hidden');
     if (usernameEl) usernameEl.textContent = AppState.profile.display_name || AppState.profile.username;
-    if (adminBtn) adminBtn.classList.toggle('hidden', !AppState.profile.admin_verified);
+    if (adminBtn) adminBtn.classList.toggle('hidden', !AppState.profile.is_admin);
   } else {
     if (loggedOutEl) loggedOutEl.classList.remove('hidden');
     if (loggedInEl) loggedInEl.classList.add('hidden');
