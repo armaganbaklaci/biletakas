@@ -218,8 +218,10 @@ async function submitNewListing(formData) {
     status: 'pending',
   };
 
-  console.log("AppState.user =", AppState.user);
-  console.log("seller_id =", AppState.user?.id);
+  const { data: sessionData } = await sb.auth.getSession();
+  console.log("SESSION =", sessionData.session);
+  console.log("AUTH USER ID =", sessionData.session?.user?.id);
+  console.log("PAYLOAD SELLER ID =", payload.seller_id);
 
   var res = await sb.from('listings').insert(payload);
   if (res.error) throw res.error;
