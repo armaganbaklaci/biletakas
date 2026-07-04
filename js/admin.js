@@ -35,6 +35,7 @@ async function initAdminPage() {
   }
 
   statusEl.textContent = 'Admin olarak giriş yapıldı. Bekleyen ilanlar yükleniyor...';
+  await loadAdminStats();
   await loadPendingListings();
   await loadAdminOffers();
 }
@@ -198,4 +199,29 @@ function createOfferHtml(o) {
       </div>
     </div>
   `;
+}
+
+
+async function loadAdminStats() {
+  const [
+    listingsTotal,
+    listingsPending,
+    offersTotal,
+    usersTotal
+  ] = await Promise.all([
+    sb.from('listings').select('id', { count: 'exact', head: true }),
+    sb.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    sb.from('offers').select('id', { count: 'exact', head: true }),
+    sb.from('profiles').select('id', { count: 'exact', head: true })
+  ]);
+
+  setText('stat-total-listings', listingsTotal.count ?? 0);
+  setText('stat-pending-listings', listingsPending.count ?? 0);
+  setText('stat-total-offers', offersTotal.count ?? 0);
+  setText('stat-total-users', usersTotal.count ?? 0);
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
 }
