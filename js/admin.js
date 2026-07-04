@@ -264,9 +264,6 @@ function createUserHtml(u) {
           <button class="btn-toggle-user px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-id="${u.id}" data-field="admin_verified" data-value="${!u.admin_verified}">
             ${u.admin_verified ? 'Admin onayı kaldır' : 'Admin onaylı yap'}
           </button>
-          <button class="btn-toggle-user px-3 py-2 rounded-lg ${u.is_admin ? 'bg-red-700 hover:bg-red-600' : 'bg-purple-700 hover:bg-purple-600'} text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed" data-id="${u.id}" data-field="is_admin" data-value="${!u.is_admin}" ${disableAdminButton ? 'disabled' : ''}>
-            ${u.is_admin ? 'Adminliği kaldır' : 'Admin yap'}
-          </button>
         </div>
       </div>
     </div>
