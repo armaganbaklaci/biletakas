@@ -391,7 +391,9 @@ async function loadAdminLogs() {
     .select('*')
     .order('created_at', { ascending: false })
     .limit(200);
-    console.log("LOG QUERY", data, error);
+    console.log("DATA:", data);
+    console.log("ERROR:", error);
+    console.dir(error);
 
   if (error) {
     console.warn(error);
