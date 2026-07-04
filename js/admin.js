@@ -2,18 +2,40 @@
 // biletakas — Admin Panel
 // ============================================================
 
+async function isCurrentUserAdmin() {
+  if (!sb || !AppState.user) return false;
+
+  var res = await sb
+    .from('profiles')
+    .select('is_admin, admin_verified')
+    .eq('id', AppState.user.id)
+    .single();
+
+  if (res.error || !res.data) {
+    console.error('[biletakas] Admin kontrolü yapılamadı:', res.error);
+    return false;
+  }
+
+  AppState.profile = Object.assign({}, AppState.profile || {}, res.data);
+
+  return !!res.data.is_admin;
+}
+
 async function fetchPendingListings() {
   if (!sb) return [];
+
   var res = await sb
     .from('listings')
     .select('*, seller:profiles(username, display_name)')
     .eq('status', 'pending')
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false });
 
   if (res.error) {
     console.error('[biletakas] Bekleyen ilanlar çekilemedi:', res.error);
+    showToast('Bekleyen ilanlar yüklenemedi.');
     return [];
   }
+
   return res.data || [];
 }
 
@@ -29,6 +51,7 @@ function renderPendingListings(listings) {
   container.innerHTML = listings.map(function (l) {
     var seller = l.seller || {};
     var sellerName = escapeHtml(seller.display_name || seller.username || 'Kullanıcı');
+
     return (
       '<div class="rounded-xl bg-surface-700/60 border border-white/5 p-3.5">' +
         '<div class="flex items-start justify-between gap-2">' +
@@ -37,10 +60,13 @@ function renderPendingListings(listings) {
             '<p class="text-xs text-zinc-500 mt-0.5">' + escapeHtml(l.venue) + ' · ' + escapeHtml(l.city) + '</p>' +
             '<p class="text-xs text-zinc-500">' + formatEventDate(l.event_datetime) + '</p>' +
             '<p class="text-xs text-zinc-500 mt-1">İlan sahibi: ' + sellerName + '</p>' +
+            '<p class="text-xs text-zinc-500 mt-1">' + Number(l.quantity || 1) + ' bilet · ' + escapeHtml(l.ticket_type || '-') + '</p>' +
           '</div>' +
           '<p class="text-lg font-bold text-white shrink-0">' + formatPrice(l.price) + '</p>' +
         '</div>' +
+
         (l.description ? '<p class="mt-2 text-xs text-zinc-500 leading-relaxed">' + escapeHtml(l.description) + '</p>' : '') +
+
         '<div class="mt-3 flex gap-2">' +
           '<button type="button" class="btn-admin-approve flex-1 py-2 rounded-lg bg-emerald-600/90 text-white text-xs font-semibold hover:bg-emerald-600 transition-all" data-listing-id="' + l.id + '">Onayla</button>' +
           '<button type="button" class="btn-admin-reject flex-1 py-2 rounded-lg bg-surface-700 border border-white/10 text-white text-xs font-semibold hover:bg-surface-600 transition-all" data-listing-id="' + l.id + '">Reddet</button>' +
@@ -50,38 +76,67 @@ function renderPendingListings(listings) {
   }).join('');
 
   container.querySelectorAll('.btn-admin-approve').forEach(function (btn) {
-    btn.addEventListener('click', function () { handleListingDecision(btn.getAttribute('data-listing-id'), 'active'); });
+    btn.addEventListener('click', function () {
+      handleListingDecision(btn.getAttribute('data-listing-id'), 'active');
+    });
   });
+
   container.querySelectorAll('.btn-admin-reject').forEach(function (btn) {
-    btn.addEventListener('click', function () { handleListingDecision(btn.getAttribute('data-listing-id'), 'rejected'); });
+    btn.addEventListener('click', function () {
+      handleListingDecision(btn.getAttribute('data-listing-id'), 'rejected');
+    });
   });
 }
 
 async function handleListingDecision(listingId, newStatus) {
   if (!sb) return;
-  var res = await sb.from('listings').update({ status: newStatus }).eq('id', listingId);
+
+  var adminOk = await isCurrentUserAdmin();
+  if (!adminOk) {
+    showToast('Bu işlem için admin yetkisi gerekli.');
+    return;
+  }
+
+  var res = await sb
+    .from('listings')
+    .update({ status: newStatus })
+    .eq('id', listingId);
+
   if (res.error) {
+    console.error('[biletakas] İlan durumu güncellenemedi:', res.error);
     showToast('İşlem başarısız oldu.');
     return;
   }
+
   showToast(newStatus === 'active' ? 'İlan onaylandı.' : 'İlan reddedildi.');
+
   var pending = await fetchPendingListings();
   renderPendingListings(pending);
-  if (newStatus === 'active') {
+
+  if (newStatus === 'active' && typeof loadAndRenderListings === 'function') {
     loadAndRenderListings();
   }
 }
 
-function openAdminModal() {
-  if (!AppState.profile || !AppState.profile.admin_verified) {
+async function openAdminModal() {
+  var adminOk = await isCurrentUserAdmin();
+
+  if (!adminOk) {
     showToast('Bu bölüm sadece yöneticiler içindir.');
     return;
   }
+
   var modal = document.getElementById('admin-modal');
   var list = document.getElementById('admin-pending-list');
-  list.innerHTML = '<p class="text-center text-sm text-zinc-500 py-8">Yükleniyor…</p>';
+
+  if (list) {
+    list.innerHTML = '<p class="text-center text-sm text-zinc-500 py-8">Yükleniyor…</p>';
+  }
+
   openModalEl(modal);
-  fetchPendingListings().then(renderPendingListings);
+
+  var pending = await fetchPendingListings();
+  renderPendingListings(pending);
 }
 
 function closeAdminModal() {
@@ -94,12 +149,20 @@ function wireAdminUI() {
   var btnClose = document.getElementById('admin-close');
   var backdrop = document.getElementById('admin-backdrop');
 
-  if (btnOpen) btnOpen.addEventListener('click', openAdminModal);
+  if (btnOpen) {
+    btnOpen.addEventListener('click', function (e) {
+      e.preventDefault();
+      openAdminModal();
+    });
+  }
+
   if (btnClose) btnClose.addEventListener('click', closeAdminModal);
   if (backdrop) backdrop.addEventListener('click', closeAdminModal);
 
   document.addEventListener('keydown', function (e) {
     var modal = document.getElementById('admin-modal');
-    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) closeAdminModal();
+    if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+      closeAdminModal();
+    }
   });
 }
