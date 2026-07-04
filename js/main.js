@@ -7,7 +7,10 @@ document.addEventListener('DOMContentLoaded', function () {
   wireListingsUI();
   wireOfferModalUI();
   wireMyOffersUI();
-  wireAdminUI();
+
+  if (typeof wireAdminUI === 'function') {
+    wireAdminUI();
+  }
 
   initAuth();
   loadAndRenderListings();
