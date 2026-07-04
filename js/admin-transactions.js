@@ -92,15 +92,23 @@ function createAdminTransactionHtml(txn) {
             '<span class="px-2 py-1 rounded-lg text-xs border bg-zinc-800 border-white/10 text-zinc-300">' + escapeHtml(PAYMENT_METHOD_LABELS[txn.payment_method] || txn.payment_method) + '</span>' +
           '</div>' +
           '<p class="text-xs text-zinc-500 mt-2">Oluşturulma: ' + formatTransactionDate(txn.created_at) + '</p>' +
+          (txn.ticket_uploaded_at ? '<p class="text-xs text-zinc-500">Bilet yüklendi: ' + formatTransactionDate(txn.ticket_uploaded_at) + '</p>' : '') +
+          (txn.ticket_verified_at ? '<p class="text-xs text-emerald-500/80">Bilet doğrulandı: ' + formatTransactionDate(txn.ticket_verified_at) + '</p>' : '') +
+          (txn.buyer_payment_notified_at ? '<p class="text-xs text-yellow-500/80">Alıcı ödeme bildirdi: ' + formatTransactionDate(txn.buyer_payment_notified_at) + '</p>' : '') +
         '</div>' +
         '<div class="lg:text-right">' +
           '<p class="text-2xl font-bold">' + formatTransactionAmount(txn.amount) + '</p>' +
         '</div>' +
       '</div>' +
+      (txn.ticket_file_path
+        ? '<div class="mt-3 flex flex-wrap gap-2">' +
+            '<button type="button" class="btn-txn-view-ticket px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold" data-id="' + txn.id + '" data-path="' + escapeHtml(txn.ticket_file_path) + '">Bileti Gör / İndir</button>' +
+          '</div>'
+        : '<p class="mt-3 text-xs text-zinc-500">Henüz bilet dosyası yüklenmedi.</p>') +
       '<div class="mt-4 flex flex-wrap gap-2">' +
+        actionBtn('ticket_verified', '✓ Bilet Doğrulandı', 'bg-indigo-600 hover:bg-indigo-500') +
         actionBtn('payment_received', '✓ Ödeme Geldi', 'bg-emerald-600 hover:bg-emerald-500') +
-        actionBtn('ticket_received', '✓ Bilet Satıcıdan Geldi', 'bg-indigo-600 hover:bg-indigo-500') +
-        actionBtn('delivered_to_buyer', '✓ Alıcıya Gönderildi', 'bg-violet-600 hover:bg-violet-500') +
+        actionBtn('ticket_sent_to_buyer', '✓ Alıcıya Gönderildi', 'bg-violet-600 hover:bg-violet-500') +
         actionBtn('buyer_confirmed', '✓ Alıcı Onayladı', 'bg-blue-600 hover:bg-blue-500') +
         actionBtn('completed', '✓ İşlem Tamamlandı', 'bg-emerald-700 hover:bg-emerald-600') +
         actionBtn('cancelled', '✓ İptal', 'bg-red-600 hover:bg-red-500') +
@@ -127,6 +135,12 @@ function wireAdminTransactionEvents() {
   document.querySelectorAll('.btn-txn-note').forEach(function (btn) {
     btn.addEventListener('click', function () {
       handleSaveTransactionNote(btn.getAttribute('data-id'));
+    });
+  });
+
+  document.querySelectorAll('.btn-txn-view-ticket').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      handleViewTicketFile(btn.getAttribute('data-path'));
     });
   });
 }
@@ -172,4 +186,19 @@ async function handleSaveTransactionNote(transactionId) {
   if (idx !== -1) _allAdminTransactions[idx] = res.data;
 
   textarea.value = res.data.admin_note || '';
+}
+
+async function handleViewTicketFile(filePath) {
+  if (!filePath) {
+    alert('Bilet dosyası bulunamadı.');
+    return;
+  }
+
+  var url = await getTicketSignedUrl(filePath, 3600);
+  if (!url) {
+    alert('Bilet dosyası açılamadı.');
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
 }

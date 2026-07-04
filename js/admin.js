@@ -451,6 +451,10 @@ function createLogHtml(log) {
       case "user_update":
         return '<span class="px-2 py-1 rounded-md bg-purple-500/15 text-purple-300 text-xs font-semibold">Kullanıcı</span>';
       case "transaction_payment_received":
+      case "transaction_ticket_uploaded":
+      case "transaction_ticket_verified":
+      case "transaction_buyer_payment_notified":
+      case "transaction_ticket_sent_to_buyer":
       case "transaction_ticket_received":
       case "transaction_delivered_to_buyer":
       case "transaction_buyer_confirmed":
