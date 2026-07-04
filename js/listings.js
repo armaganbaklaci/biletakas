@@ -3,24 +3,19 @@
 // ============================================================
 
 var _allListings = []; // ekranda gösterilen aktif ilanların önbelleği
-const EVENT_GRACE_HOURS = 4;
 
 /* ---------- Veri çekme ---------- */
 async function fetchActiveListings() {
   if (!sb) return [];
 
+  var nowIso = new Date().toISOString();
 
- // Etkinlikten sonraki 8 saate kadar ilanlar görünmeye devam etsin
-const cutoffIso = new Date(
-  Date.now() - EVENT_GRACE_HOURS * 60 * 60 * 1000
-).toISOString();
-
-var res = await sb
-  .from('listings')
-  .select('*, seller:profiles(username, display_name, email_verified, phone_verified, instagram_verified, admin_verified, sales_count, purchase_count)')
-  .eq('status', 'active')
-  .gte('event_datetime', cutoffIso)
-  .order('event_datetime', { ascending: true });
+  var res = await sb
+    .from('listings')
+    .select('*, seller:profiles(username, display_name, email_verified, phone_verified, instagram_verified, trusted_seller, sales_count, purchase_count)')
+    .eq('status', 'active')
+    .gte('event_datetime', nowIso)
+    .order('event_datetime', { ascending: true });
 
   if (res.error) {
     console.error('[biletakas] İlanlar çekilemedi:', res.error);
@@ -64,8 +59,8 @@ function createListingCardHtml(listing) {
     trustBadge(!!seller.instagram_verified, 'Instagram doğrulandı', 'Instagram doğrulanmadı'),
   ].join('');
 
-  var adminBadge = seller.admin_verified
-    ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent/15 border border-accent/30 text-accent-light text-[11px] font-semibold">🏅 Yönetici onaylı</span>'
+  var adminBadge = seller.trusted_seller
+    ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent/15 border border-accent/30 text-accent-light text-[11px] font-semibold">🏅 Güvenilir satıcı</span>'
     : '';
 
   var salesBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-300 text-[11px] font-medium">🎟️ ' + (seller.sales_count || 0) + ' satış</span>';
@@ -223,14 +218,9 @@ async function submitNewListing(formData) {
     status: 'pending',
   };
 
-  const { data: sessionData } = await sb.auth.getSession();
-  console.log("SESSION =", sessionData.session);
-  console.log("AUTH USER ID =", sessionData.session?.user?.id);
-  console.log("PAYLOAD SELLER ID =", payload.seller_id);
-
-  var res = await sb.from('listings').insert(payload);
+  var res = await sb.from('listings').insert(payload).select().single();
   if (res.error) throw res.error;
-  return true;
+  return res.data;
 }
 
 function wireListingsUI() {
@@ -286,18 +276,8 @@ function wireListingsUI() {
         description: document.getElementById('sell-description').value.trim(),
       };
 
-        if (!formData.artist || !formData.venue || !formData.city || !formData.eventDatetime || !formData.ticketType || !formData.quantity || !formData.price) {
+      if (!formData.artist || !formData.venue || !formData.city || !formData.eventDatetime || !formData.ticketType || !formData.quantity || !formData.price) {
         errorEl.textContent = 'Lütfen tüm zorunlu alanları doldurun.';
-        errorEl.classList.remove('hidden');
-        return;
-      }
-
-      const cutoffTime = new Date(
-        Date.now() - EVENT_GRACE_HOURS * 60 * 60 * 1000
-      );
-
-      if (new Date(formData.eventDatetime) < cutoffTime) {
-        errorEl.textContent = 'Bu etkinlik için ilan verme süresi dolmuş.';
         errorEl.classList.remove('hidden');
         return;
       }

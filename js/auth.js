@@ -42,7 +42,9 @@ async function ensureProfile(user) {
     email_verified: !!user.email_confirmed_at,
     phone_verified: false,
     instagram_verified: false,
-    admin_verified: false,
+    is_admin: false,
+    is_banned: false,
+    trusted_seller: false,
     sales_count: 0,
     purchase_count: 0,
   }).select().single();
