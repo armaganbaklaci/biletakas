@@ -387,7 +387,7 @@ async function loadAdminLogs() {
 
   const { data, error } = await sb
     .from('admin_logs')
-    .select('*, admin:profiles(username, display_name)')
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -434,8 +434,7 @@ function renderLogs() {
 }
 
 function createLogHtml(log) {
-  const admin = log.admin || {};
-  const adminName = admin.display_name || admin.username || 'Admin';
+  const adminName = 'Admin';
   return `
     <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
       <div class="flex flex-col md:flex-row md:justify-between gap-2">
