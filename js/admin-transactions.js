@@ -125,12 +125,25 @@ function createAdminTransactionHtml(txn) {
 }
 
 function wireAdminTransactionEvents() {
-  document.querySelectorAll('.btn-txn-action').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      if (btn.disabled) return;
-      handleAdminTransactionAction(btn.getAttribute('data-id'), btn.getAttribute('data-action'));
-    });
+  const TXN_CONFIRM_MESSAGES = {
+  ticket_verified: 'Bileti doğruladığına emin misin?',
+  payment_received: 'Ödemenin geldiğine emin misin?',
+  ticket_sent_to_buyer: 'Bileti alıcıya gönderildi olarak işaretlemek istediğine emin misin?',
+  buyer_confirmed: 'Alıcının işlemi onayladığına emin misin?',
+  completed: 'İşlemi tamamlamak istediğine emin misin?',
+  cancelled: 'İşlemi iptal etmek istediğine emin misin?'
+};
+
+document.querySelectorAll('.btn-txn-action').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    const action = btn.dataset.action;
+    const message = TXN_CONFIRM_MESSAGES[action];
+
+    if (message && !window.confirm(message)) return;
+
+    updateTransactionStatus(btn.dataset.id, action);
   });
+});
 
   document.querySelectorAll('.btn-txn-note').forEach(function (btn) {
     btn.addEventListener('click', function () {
