@@ -9,49 +9,77 @@
 </head>
 
 <body class="bg-zinc-950 text-white min-h-screen">
-  <main class="max-w-5xl mx-auto px-4 py-8">
+    <main class="max-w-6xl mx-auto px-4 py-8">
     <div class="flex items-center justify-between mb-8">
-      <div>
+        <div>
         <h1 class="text-3xl font-bold">Admin Panel</h1>
-        <p class="text-zinc-400 text-sm">Bekleyen ilanları onayla veya reddet.</p>
-      </div>
+        <p class="text-zinc-400 text-sm">İlanları, teklifleri ve kullanıcıları yönet.</p>
+        </div>
 
-      <a href="index.html" class="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm">
+        <a href="index.html" class="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm">
         Ana sayfa
-      </a>
+        </a>
     </div>
 
     <div id="admin-status" class="mb-4 text-sm text-zinc-400">
-      Kontrol ediliyor...
+        Kontrol ediliyor...
     </div>
 
-    <section id="admin-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
-        <p class="text-sm text-zinc-400">Toplam İlan</p>
-        <p id="stat-total-listings" class="text-2xl font-bold">-</p>
-      </div>
+    <nav class="flex flex-wrap gap-2 mb-6">
+        <button class="admin-tab px-4 py-2 rounded-lg bg-purple-600 text-sm font-semibold" data-tab="dashboard">Dashboard</button>
+        <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 text-sm font-semibold" data-tab="pending">Bekleyen İlanlar</button>
+        <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 text-sm font-semibold" data-tab="offers">Teklifler</button>
+        <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 text-sm font-semibold" data-tab="users">Kullanıcılar</button>
+        <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 text-sm font-semibold" data-tab="history">İlan Geçmişi</button>
+        <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 text-sm font-semibold" data-tab="logs">İşlem Geçmişi</button>
+    </nav>
 
-      <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
-        <p class="text-sm text-zinc-400">Bekleyen İlan</p>
-        <p id="stat-pending-listings" class="text-2xl font-bold">-</p>
-      </div>
-
-      <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
-        <p class="text-sm text-zinc-400">Toplam Teklif</p>
-        <p id="stat-total-offers" class="text-2xl font-bold">-</p>
-      </div>
-
-      <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
-        <p class="text-sm text-zinc-400">Kullanıcı</p>
-        <p id="stat-total-users" class="text-2xl font-bold">-</p>
-      </div>
+    <section id="tab-dashboard" class="admin-panel">
+        <section id="admin-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
+            <p class="text-sm text-zinc-400">Toplam İlan</p>
+            <p id="stat-total-listings" class="text-2xl font-bold">-</p>
+        </div>
+        <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
+            <p class="text-sm text-zinc-400">Bekleyen İlan</p>
+            <p id="stat-pending-listings" class="text-2xl font-bold">-</p>
+        </div>
+        <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
+            <p class="text-sm text-zinc-400">Toplam Teklif</p>
+            <p id="stat-total-offers" class="text-2xl font-bold">-</p>
+        </div>
+        <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
+            <p class="text-sm text-zinc-400">Kullanıcı</p>
+            <p id="stat-total-users" class="text-2xl font-bold">-</p>
+        </div>
+        </section>
     </section>
 
-    <section id="admin-pending-list" class="grid gap-4"></section>
+    <section id="tab-pending" class="admin-panel hidden">
+        <h2 class="text-2xl font-bold mb-4">Bekleyen İlanlar</h2>
+        <section id="admin-pending-list" class="grid gap-4"></section>
+    </section>
 
-    <h2 class="text-2xl font-bold mt-10 mb-4">Son Teklifler</h2>
-    <section id="admin-offers-list" class="grid gap-4"></section>
-  </main>
+    <section id="tab-offers" class="admin-panel hidden">
+        <h2 class="text-2xl font-bold mb-4">Teklifler</h2>
+        <section id="admin-offers-list" class="grid gap-4"></section>
+    </section>
+
+    <section id="tab-users" class="admin-panel hidden">
+        <h2 class="text-2xl font-bold mb-4">Kullanıcılar</h2>
+        <section id="admin-users-list" class="grid gap-4"></section>
+    </section>
+
+    <section id="tab-history" class="admin-panel hidden">
+        <h2 class="text-2xl font-bold mb-4">İlan Geçmişi</h2>
+        <section id="admin-listing-history" class="grid gap-4"></section>
+    </section>
+
+    <section id="tab-logs" class="admin-panel hidden">
+        <h2 class="text-2xl font-bold mb-4">İşlem Geçmişi</h2>
+        <section id="admin-logs-list" class="grid gap-4"></section>
+    </section>
+    </main>
 
   <script src="js/config.js"></script>
   <script src="js/supabaseClient.js"></script>
