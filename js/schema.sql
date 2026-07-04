@@ -138,6 +138,9 @@ create policy "Satıcı kendi ilanına gelen teklifi güncelleyebilir (kabul/red
 -- ============================================================
 -- Notlar
 -- ============================================================
+-- Transaction (manuel IBAN) sistemi için:
+--   migrations/002_transactions.sql dosyasını SQL Editor'de çalıştırın.
+--
 -- 1) İlk admin kullanıcıyı elle atamanız gerekir, örnek:
 --    update public.profiles set admin_verified = true where username = 'KullaniciAdi';
 --

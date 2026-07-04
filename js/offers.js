@@ -208,7 +208,17 @@ async function handleOfferDecision(offerId, decision) {
     }
   });
 
-  showToast(decision === 'accepted' ? 'Teklif kabul edildi.' : 'Teklif reddedildi.');
+  if (decision === 'accepted') {
+    var txn = await fetchTransactionByOfferId(offerId);
+    if (txn && txn.transaction_code) {
+      showToast('Teklif kabul edildi. İşlem kodu: ' + txn.transaction_code);
+    } else {
+      showToast('Teklif kabul edildi. İşlem oluşturuldu.');
+    }
+  } else {
+    showToast('Teklif reddedildi.');
+  }
+
   var offers = await fetchReceivedOffers();
   renderReceivedOffers(offers);
 }

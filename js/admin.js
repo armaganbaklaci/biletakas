@@ -57,6 +57,7 @@ async function initAdminPage() {
     loadAdminStats(),
     loadPendingListings(),
     loadAdminOffers(),
+    loadAdminTransactions(),
     loadAdminUsers(),
     loadListingHistory(),
     loadAdminLogs()
@@ -408,6 +409,7 @@ async function loadAdminLogs() {
         <option value="listing_status_update">İlan işlemleri</option>
         <option value="offer_status_update">Teklif işlemleri</option>
         <option value="user_update">Kullanıcı işlemleri</option>
+        <option value="transaction">Ödeme / işlem</option>
       </select>
     </div>
     <div id="logs-results" class="grid gap-4"></div>
@@ -426,7 +428,10 @@ function renderLogs() {
   const rows = allLogs.filter((log) => {
     const admin = log.admin || {};
     const text = `${log.action || ''} ${log.message || ''} ${admin.username || ''} ${admin.display_name || ''}`.toLowerCase();
-    return (type === 'all' || log.action === type) && (!q || text.includes(q));
+    const typeMatch = type === 'all'
+      || log.action === type
+      || (type === 'transaction' && String(log.action || '').startsWith('transaction_'));
+    return typeMatch && (!q || text.includes(q));
   });
 
   resultsEl.innerHTML = rows.length
@@ -445,7 +450,17 @@ function createLogHtml(log) {
         return '<span class="px-2 py-1 rounded-md bg-sky-500/15 text-sky-300 text-xs font-semibold">İlan</span>';
       case "user_update":
         return '<span class="px-2 py-1 rounded-md bg-purple-500/15 text-purple-300 text-xs font-semibold">Kullanıcı</span>';
+      case "transaction_payment_received":
+      case "transaction_ticket_received":
+      case "transaction_delivered_to_buyer":
+      case "transaction_buyer_confirmed":
+      case "transaction_completed":
+      case "transaction_cancelled":
+        return '<span class="px-2 py-1 rounded-md bg-amber-500/15 text-amber-300 text-xs font-semibold">İşlem</span>';
       default:
+        if (String(action || '').startsWith('transaction_')) {
+          return '<span class="px-2 py-1 rounded-md bg-amber-500/15 text-amber-300 text-xs font-semibold">İşlem</span>';
+        }
         return '<span class="px-2 py-1 rounded-md bg-zinc-700 text-zinc-300 text-xs">Diğer</span>';
     }
   }
@@ -483,17 +498,21 @@ async function addLog(action, message, meta = {}) {
 // Stats / Tabs / Helpers
 // ------------------------------------------------------------
 async function loadAdminStats() {
-  const [listingsTotal, listingsPending, offersTotal, usersTotal] = await Promise.all([
+  const [listingsTotal, listingsPending, offersTotal, usersTotal, transactionsTotal, transactionsPending] = await Promise.all([
     sb.from('listings').select('id', { count: 'exact', head: true }),
     sb.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     sb.from('offers').select('id', { count: 'exact', head: true }),
-    sb.from('profiles').select('id', { count: 'exact', head: true })
+    sb.from('profiles').select('id', { count: 'exact', head: true }),
+    sb.from('transactions').select('id', { count: 'exact', head: true }),
+    sb.from('transactions').select('id', { count: 'exact', head: true }).eq('payment_status', 'waiting_payment')
   ]);
 
   setText('stat-total-listings', listingsTotal.count ?? 0);
   setText('stat-pending-listings', listingsPending.count ?? 0);
   setText('stat-total-offers', offersTotal.count ?? 0);
   setText('stat-total-users', usersTotal.count ?? 0);
+  setText('stat-total-transactions', transactionsTotal.error ? '—' : (transactionsTotal.count ?? 0));
+  setText('stat-pending-payments', transactionsPending.error ? '—' : (transactionsPending.count ?? 0));
 }
 
 function wireAdminTabs() {

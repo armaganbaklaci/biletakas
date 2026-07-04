@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function () {
   wireListingsUI();
   wireOfferModalUI();
   wireMyOffersUI();
+  wireMyTransactionsUI();
 
   if (typeof wireAdminUI === 'function') {
     wireAdminUI();

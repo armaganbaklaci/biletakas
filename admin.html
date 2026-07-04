@@ -29,13 +29,14 @@
       <button class="admin-tab px-4 py-2 rounded-lg bg-purple-600 text-sm font-semibold" data-tab="dashboard">Dashboard</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="pending">Bekleyen İlanlar</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="offers">Teklifler</button>
+      <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="transactions">İşlemler</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="users">Kullanıcılar</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="history">İlan Geçmişi</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="logs">İşlem Geçmişi</button>
     </nav>
 
     <section id="tab-dashboard" class="admin-panel">
-      <section id="admin-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <section id="admin-stats" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
           <p class="text-sm text-zinc-400">Toplam İlan</p>
           <p id="stat-total-listings" class="text-2xl font-bold">-</p>
@@ -54,6 +55,16 @@
         <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
           <p class="text-sm text-zinc-400">Kullanıcı</p>
           <p id="stat-total-users" class="text-2xl font-bold">-</p>
+        </div>
+
+        <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
+          <p class="text-sm text-zinc-400">Toplam İşlem</p>
+          <p id="stat-total-transactions" class="text-2xl font-bold">-</p>
+        </div>
+
+        <div class="rounded-xl bg-zinc-900 border border-white/10 p-4">
+          <p class="text-sm text-zinc-400">Ödeme Bekleyen</p>
+          <p id="stat-pending-payments" class="text-2xl font-bold">-</p>
         </div>
       </section>
 
@@ -80,6 +91,14 @@
         <p class="text-sm text-zinc-400">Sitedeki teklifleri buradan takip edebilirsin.</p>
       </div>
       <section id="admin-offers-list" class="grid gap-4"></section>
+    </section>
+
+    <section id="tab-transactions" class="admin-panel hidden">
+      <div class="mb-4">
+        <h2 class="text-2xl font-bold">İşlemler</h2>
+        <p class="text-sm text-zinc-400">Manuel IBAN ödemelerini ve bilet teslim sürecini buradan yönet.</p>
+      </div>
+      <section id="admin-transactions-list" class="grid gap-4"></section>
     </section>
 
     <section id="tab-users" class="admin-panel hidden">
@@ -111,6 +130,8 @@
 
   <script src="js/config.js"></script>
   <script src="js/supabaseClient.js"></script>
-  <script src="js/admin.js?v=6"></script>
+  <script src="js/transactions.js"></script>
+  <script src="js/admin-transactions.js"></script>
+  <script src="js/admin.js?v=7"></script>
 </body>
 </html>
