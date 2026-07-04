@@ -170,12 +170,44 @@ function renderReceivedOffers(offers) {
 }
 
 async function handleOfferDecision(offerId, decision) {
-  if (!sb) return;
-  var res = await sb.from('offers').update({ status: decision }).eq('id', offerId);
-  if (res.error) {
+  if (!sb || !AppState.user) return;
+
+  var res = await sb
+    .from('offers')
+    .update({ status: decision })
+    .eq('id', offerId)
+    .select(`
+      id,
+      amount,
+      status,
+      listing:listings(id, artist, seller_id),
+      buyer:profiles(username, display_name)
+    `)
+    .single();
+
+  if (res.error || !res.data) {
     showToast('İşlem başarısız oldu.');
     return;
   }
+
+  var offer = res.data;
+  var listing = offer.listing || {};
+  var buyer = offer.buyer || {};
+  var buyerName = buyer.display_name || buyer.username || 'Kullanıcı';
+  var decisionText = decision === 'accepted' ? 'kabul edildi' : 'reddedildi';
+
+  await sb.from('admin_logs').insert({
+    admin_id: AppState.user.id,
+    action: 'offer_status_update',
+    message: buyerName + ' kullanıcısının ' + (listing.artist || 'ilan') + ' teklifı ' + decisionText + '.',
+    metadata: {
+      offer_id: offerId,
+      listing_id: listing.id || null,
+      amount: offer.amount,
+      new_status: decision
+    }
+  });
+
   showToast(decision === 'accepted' ? 'Teklif kabul edildi.' : 'Teklif reddedildi.');
   var offers = await fetchReceivedOffers();
   renderReceivedOffers(offers);

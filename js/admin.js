@@ -405,6 +405,7 @@ async function loadAdminLogs() {
       <select id="logs-type" class="rounded-lg bg-zinc-950 border border-white/10 px-3 py-2 text-sm">
         <option value="all">Tüm işlemler</option>
         <option value="listing_status_update">İlan işlemleri</option>
+        <option value="offer_status_update">Teklif işlemleri</option>
         <option value="user_update">Kullanıcı işlemleri</option>
       </select>
     </div>
