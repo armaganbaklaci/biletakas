@@ -134,3 +134,12 @@ function formatDate(value) {
   if (!value) return '-';
   return new Date(value).toLocaleString('tr-TR');
 }
+
+async function loadAdminOffers() {
+  const { data, error } = await sb
+    .from('offers')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  console.log('OFFERS:', { data, error });
+}
