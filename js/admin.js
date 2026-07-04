@@ -382,6 +382,7 @@ function createHistoryHtml(l) {
 // Logs
 // ------------------------------------------------------------
 async function loadAdminLogs() {
+  console.log("LOAD ADMIN LOGS ÇALIŞTI");
   const el = document.getElementById('admin-logs-list');
   if (!el) return;
 
@@ -390,6 +391,7 @@ async function loadAdminLogs() {
     .select('*')
     .order('created_at', { ascending: false })
     .limit(200);
+    console.log("LOG QUERY", data, error);
 
   if (error) {
     console.warn(error);
