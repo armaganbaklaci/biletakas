@@ -5,6 +5,8 @@
 document.addEventListener('DOMContentLoaded', initAdminPage);
 
 async function initAdminPage() {
+  wireAdminTabs();
+
   const statusEl = document.getElementById('admin-status');
   const listEl = document.getElementById('admin-pending-list');
 
@@ -224,4 +226,32 @@ async function loadAdminStats() {
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.textContent = value;
+}
+
+function wireAdminTabs() {
+  const tabButtons = document.querySelectorAll('.admin-tab');
+  const panels = document.querySelectorAll('.admin-panel');
+
+  tabButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+
+      tabButtons.forEach((b) => {
+        b.classList.remove('bg-purple-600');
+        b.classList.add('bg-zinc-800');
+      });
+
+      btn.classList.remove('bg-zinc-800');
+      btn.classList.add('bg-purple-600');
+
+      panels.forEach((panel) => {
+        panel.classList.add('hidden');
+      });
+
+      const activePanel = document.getElementById(`tab-${target}`);
+      if (activePanel) {
+        activePanel.classList.remove('hidden');
+      }
+    });
+  });
 }
