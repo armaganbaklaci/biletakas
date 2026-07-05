@@ -13,12 +13,45 @@ function escapeHtml(value) {
 
 
 var _allAdminTransactions = [];
+var _sellerPayoutCache = {};
+
+async function fetchSellerPayoutInfoForUser(userId) {
+  if (!sb || !userId) return null;
+  if (_sellerPayoutCache[userId]) return _sellerPayoutCache[userId];
+
+  var res = await sb
+    .from('seller_payout_methods')
+    .select('full_name, iban, account_name, bank_name, phone, email, is_verified, payout_status')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (res.error) {
+    console.error('[biletakas] Satıcı payout bilgisi çekilemedi:', res.error);
+    return null;
+  }
+
+  _sellerPayoutCache[userId] = res.data || null;
+  return _sellerPayoutCache[userId];
+}
+
+async function hydrateAdminTransactionSellerPayouts(transactions) {
+  if (!Array.isArray(transactions)) return;
+
+  for (var i = 0; i < transactions.length; i++) {
+    var txn = transactions[i];
+    if (!txn || !txn.seller_id || txn._sellerPayout) continue;
+    txn._sellerPayout = await fetchSellerPayoutInfoForUser(txn.seller_id);
+  }
+}
 
 async function loadAdminTransactions() {
   var container = document.getElementById('admin-transactions-list');
   if (!container) return;
 
   _allAdminTransactions = await fetchAllTransactions();
+  await hydrateAdminTransactionSellerPayouts(_allAdminTransactions);
   renderAdminTransactionsShell();
   renderAdminTransactions();
 }
@@ -67,7 +100,10 @@ function createAdminTransactionHtml(txn) {
   var listing = txn.listing || {};
   var buyer = txn.buyer || {};
   var seller = txn.seller || {};
+  var sellerPayout = txn._sellerPayout || {};
   var actions = getEnabledAdminActions(txn);
+  var payoutStatusLabel = txn.payout_status ? payoutStatusBadgeHtml(txn.payout_status) : '';
+  var breakdown = getTransactionPricingBreakdown(txn);
 
   function actionBtn(key, label, colorClass) {
     var enabled = actions[key];
@@ -97,7 +133,8 @@ function createAdminTransactionHtml(txn) {
           (txn.buyer_payment_notified_at ? '<p class="text-xs text-yellow-500/80">Alıcı ödeme bildirdi: ' + formatTransactionDate(txn.buyer_payment_notified_at) + '</p>' : '') +
         '</div>' +
         '<div class="lg:text-right">' +
-          '<p class="text-2xl font-bold">' + formatTransactionAmount(txn.amount) + '</p>' +
+          '<p class="text-2xl font-bold">' + formatTransactionAmount(breakdown.buyerTotalAmount) + '</p>' +
+          '<p class="text-sm text-emerald-300">Net satıcı: ' + formatTransactionAmount(breakdown.sellerPayoutAmount) + '</p>' +
         '</div>' +
       '</div>' +
       (txn.ticket_file_path
@@ -105,12 +142,50 @@ function createAdminTransactionHtml(txn) {
             '<button type="button" class="btn-txn-view-ticket px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold" data-id="' + txn.id + '" data-path="' + escapeHtml(txn.ticket_file_path) + '">Bileti Gör / İndir</button>' +
           '</div>'
         : '<p class="mt-3 text-xs text-zinc-500">Henüz bilet dosyası yüklenmedi.</p>') +
+      (txn.receipt_file_path
+        ? '<div class="mt-3 flex flex-wrap gap-2">' +
+            '<button type="button" class="btn-txn-view-receipt px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold" data-id="' + txn.id + '" data-path="' + escapeHtml(txn.receipt_file_path) + '">Dekontu Gör / İndir</button>' +
+          '</div>'
+        : '<p class="mt-3 text-xs text-zinc-500">Henüz dekont yüklenmedi.</p>') +
+      (txn.payment_note ? '<p class="mt-2 text-xs text-zinc-400">Dekont notu: ' + escapeHtml(txn.payment_note) + '</p>' : '') +
+      (txn.dispute_reason ? '<div class="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm">' +
+        '<p class="text-[11px] uppercase tracking-wide text-amber-300 font-semibold mb-1">Dispute / İade Bilgisi</p>' +
+        '<p class="text-white">' + escapeHtml(txn.dispute_reason) + '</p>' +
+        (txn.dispute_evidence_path ? '<button type="button" class="btn-txn-view-dispute mt-2 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold" data-path="' + escapeHtml(txn.dispute_evidence_path) + '">Kanıtı Gör / İndir</button>' : '') +
+        (txn.dispute_created_at ? '<p class="text-[11px] text-zinc-400 mt-2">Açılma: ' + formatTransactionDate(txn.dispute_created_at) + '</p>' : '') +
+      '</div>' : '') +
+      (sellerPayout.iban || sellerPayout.phone || sellerPayout.email
+        ? '<div class="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm">' +
+            '<p class="text-[11px] uppercase tracking-wide text-emerald-300 font-semibold mb-1">Satıcı Payout Bilgileri</p>' +
+            (sellerPayout.full_name ? '<p class="text-white">' + escapeHtml(sellerPayout.full_name) + '</p>' : '') +
+            (sellerPayout.iban ? '<p class="text-zinc-300 mt-1">IBAN: ' + escapeHtml(sellerPayout.iban) + '</p>' : '') +
+            (sellerPayout.account_name ? '<p class="text-zinc-300">Hesap Adı: ' + escapeHtml(sellerPayout.account_name) + '</p>' : '') +
+            (sellerPayout.bank_name ? '<p class="text-zinc-300">Banka: ' + escapeHtml(sellerPayout.bank_name) + '</p>' : '') +
+            (sellerPayout.phone ? '<p class="text-zinc-300">Telefon: ' + escapeHtml(sellerPayout.phone) + '</p>' : '') +
+            (sellerPayout.email ? '<p class="text-zinc-300">E-posta: ' + escapeHtml(sellerPayout.email) + '</p>' : '') +
+          '</div>'
+        : '') +
+      renderTransactionPricingSummaryHtml(txn, 'admin') +
+      renderTransactionStepper(txn) +
+      '<div class="mt-3 rounded-lg border border-white/10 bg-zinc-950/70 p-3">' +
+        '<div class="flex items-center justify-between gap-2">' +
+          '<p class="text-[11px] uppercase tracking-wide text-zinc-400 font-semibold">Payout durumu</p>' +
+          (payoutStatusLabel || '') +
+        '</div>' +
+        '<label class="mt-3 block text-[11px] font-medium text-zinc-400">Payout dekontu (PDF/JPG/PNG)</label>' +
+        '<input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" class="txn-payout-receipt-file mt-2 w-full text-xs text-zinc-400 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-surface-600 file:text-white file:text-xs file:font-semibold" data-id="' + txn.id + '">' +
+      '</div>' +
       '<div class="mt-4 flex flex-wrap gap-2">' +
+        actionBtn('refund_approved', '✓ İade Onayla', 'bg-amber-600 hover:bg-amber-500') +
+        actionBtn('refund_rejected', '✕ İade Reddet', 'bg-rose-600 hover:bg-rose-500') +
+        actionBtn('buyer_refunded', '↩ Alıcıya İade Yap', 'bg-rose-700 hover:bg-rose-600') +
+        actionBtn('seller_paid', '✓ Satıcıya Ödeme Yap', 'bg-emerald-600 hover:bg-emerald-500') +
         actionBtn('ticket_verified', '✓ Bilet Doğrulandı', 'bg-indigo-600 hover:bg-indigo-500') +
         actionBtn('payment_received', '✓ Ödeme Geldi', 'bg-emerald-600 hover:bg-emerald-500') +
-        actionBtn('ticket_sent_to_buyer', '✓ Bilet Alıcıya Gönderildi', 'bg-violet-600 hover:bg-violet-500') +
+        actionBtn('payment_rejected', '✕ Ödeme Reddedildi', 'bg-rose-600 hover:bg-rose-500') +
+        actionBtn('release_ticket_to_buyer', '🔓 Bileti Alıcıya Aç', 'bg-violet-600 hover:bg-violet-500') +
         actionBtn('buyer_confirmed', '✓ Alıcı Girişi Onayladı', 'bg-blue-600 hover:bg-blue-500') +
-        actionBtn('money_sent_to_seller', '✓ Para Satıcıya Gönderildi', 'bg-indigo-600 hover:bg-indigo-500') +
+        actionBtn('money_sent_to_seller', '✓ Satıcıya ödeme gönderildi', 'bg-indigo-600 hover:bg-indigo-500') +
         actionBtn('completed', '✓ İşlem Tamamlandı', 'bg-emerald-700 hover:bg-emerald-600') +
         actionBtn('cancelled', '✓ İptal', 'bg-red-600 hover:bg-red-500') +
       '</div>' +
@@ -129,6 +204,8 @@ function wireAdminTransactionEvents() {
   const TXN_CONFIRM_MESSAGES = {
   ticket_verified: 'Bileti doğruladığına emin misin?',
   payment_received: 'Ödemenin geldiğine emin misin?',
+  payment_rejected: 'Ödemeyi reddetmek istediğine emin misin?',
+  release_ticket_to_buyer: 'Bileti alıcıya açmak istediğine emin misin?',
   ticket_sent_to_buyer: 'Bileti alıcıya gönderildi olarak işaretlemek istediğine emin misin?',
   buyer_confirmed: 'Alıcının işlemi onayladığına emin misin?',
   completed: 'İşlemi tamamlamak istediğine emin misin?',
@@ -157,6 +234,18 @@ document.querySelectorAll('.btn-txn-action').forEach(function (btn) {
       handleViewTicketFile(btn.getAttribute('data-path'));
     });
   });
+
+  document.querySelectorAll('.btn-txn-view-receipt').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      handleViewReceiptFile(btn.getAttribute('data-path'));
+    });
+  });
+
+  document.querySelectorAll('.btn-txn-view-dispute').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      handleViewDisputeEvidenceFile(btn.getAttribute('data-path'));
+    });
+  });
 }
 
 async function handleAdminTransactionAction(transactionId, action) {
@@ -171,7 +260,18 @@ async function handleAdminTransactionAction(transactionId, action) {
     if (!ok) return;
   }
 
-  var res = await applyAdminTransactionAction(transactionId, action, addLog);
+  if (action === 'money_sent_to_seller') {
+    var payoutFileInput = document.querySelector('.txn-payout-receipt-file[data-id="' + transactionId + '"]');
+    if (payoutFileInput && payoutFileInput.files && payoutFileInput.files[0]) {
+      var payoutReceiptRes = await uploadPayoutReceipt(transactionId, payoutFileInput.files[0]);
+      if (payoutReceiptRes.error || !payoutReceiptRes.data) {
+        alert('Payout dekontu yüklenemedi: ' + ((payoutReceiptRes.error && payoutReceiptRes.error.message) || 'Bilinmeyen hata'));
+        return;
+      }
+    }
+  }
+
+  var res = await applyAdminTransactionAction(transactionId, action, txn, addLog);
   if (res.error || !res.data) {
     alert('İşlem güncellenemedi: ' + ((res.error && res.error.message) || 'Bilinmeyen hata'));
     return;
@@ -211,6 +311,34 @@ async function handleViewTicketFile(filePath) {
   var url = await getTicketSignedUrl(filePath, 3600);
   if (!url) {
     alert('Bilet dosyası açılamadı.');
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+async function handleViewDisputeEvidenceFile(filePath) {
+  if (!filePath) {
+    alert('Kanıt dosyası bulunamadı.');
+    return;
+  }
+
+  var url = await getReceiptSignedUrl(filePath, 3600);
+  if (!url) {
+    alert('Kanıt dosyası açılamadı.');
+    return;
+  }
+
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+async function handleViewReceiptFile(filePath) {
+  if (!filePath) {
+    alert('Dekont dosyası bulunamadı.');
+    return;
+  }
+
+  var url = await getReceiptSignedUrl(filePath, 3600);
+  if (!url) {
+    alert('Dekont dosyası açılamadı.');
     return;
   }
 

@@ -165,8 +165,14 @@ function setLoginModalMode(mode) {
   var switchText = document.getElementById('login-switch-text');
   var switchBtn = document.getElementById('login-switch-btn');
   var form = document.getElementById('login-form');
+  var consentGroup = document.getElementById('consent-group');
+  var consentKvkk = document.getElementById('consent-kvkk');
+  var consentAgreement = document.getElementById('consent-agreement');
 
   form.setAttribute('data-mode', mode);
+  if (consentGroup) consentGroup.classList.toggle('hidden', mode !== 'register');
+  if (consentKvkk) consentKvkk.checked = false;
+  if (consentAgreement) consentAgreement.checked = false;
 
   if (mode === 'register') {
     title.textContent = 'Kayıt Ol';
@@ -213,6 +219,16 @@ function wireAuthUI() {
       var submitBtn = document.getElementById('login-submit');
 
       if (!email || !password) return;
+
+      if (mode === 'register') {
+        var consentKvkk = document.getElementById('consent-kvkk');
+        var consentAgreement = document.getElementById('consent-agreement');
+        if (!consentKvkk || !consentAgreement || !consentKvkk.checked || !consentAgreement.checked) {
+          loginError.textContent = 'Kayıt olmak için KVKK ve kullanıcı sözleşmesi onaylarını işaretlemeniz gerekiyor.';
+          loginError.classList.remove('hidden');
+          return;
+        }
+      }
 
       loginError.classList.add('hidden');
       submitBtn.disabled = true;

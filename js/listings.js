@@ -5,6 +5,105 @@
 var _allListings = []; // ekranda gösterilen aktif ilanların önbelleği
 const EVENT_GRACE_HOURS = 4;
 
+function getSellPayoutFieldValue(id) {
+  var el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+function getSellPayoutFormData() {
+  return {
+    full_name: getSellPayoutFieldValue('sell-payout-full-name'),
+    iban: getSellPayoutFieldValue('sell-payout-iban'),
+    account_name: getSellPayoutFieldValue('sell-payout-account-name'),
+    bank_name: getSellPayoutFieldValue('sell-payout-bank-name'),
+    phone: getSellPayoutFieldValue('sell-payout-phone'),
+    email: getSellPayoutFieldValue('sell-payout-email')
+  };
+}
+
+function populateSellPayoutForm(payout) {
+  var fields = [
+    ['sell-payout-full-name', payout && payout.full_name ? payout.full_name : ''],
+    ['sell-payout-iban', payout && payout.iban ? payout.iban : ''],
+    ['sell-payout-account-name', payout && payout.account_name ? payout.account_name : ''],
+    ['sell-payout-bank-name', payout && payout.bank_name ? payout.bank_name : ''],
+    ['sell-payout-phone', payout && payout.phone ? payout.phone : ''],
+    ['sell-payout-email', payout && payout.email ? payout.email : '']
+  ];
+
+  fields.forEach(function (pair) {
+    var el = document.getElementById(pair[0]);
+    if (el) el.value = pair[1];
+  });
+}
+
+function validateSellerPayoutInfo(data) {
+  return !!(data && data.full_name && data.iban && data.phone && data.email);
+}
+
+async function loadSellerPayoutInfo() {
+  if (!sb || !AppState.user) return null;
+
+  var res = await sb
+    .from('seller_payout_methods')
+    .select('*')
+    .eq('user_id', AppState.user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (res.error) {
+    console.error('[biletakas] Payout bilgileri çekilemedi:', res.error);
+    return null;
+  }
+
+  return res.data || null;
+}
+
+async function saveSellerPayoutInfo(data) {
+  if (!sb || !AppState.user) {
+    return { data: null, error: new Error('Giriş yapmalısınız.') };
+  }
+
+  if (!validateSellerPayoutInfo(data)) {
+    return { data: null, error: null };
+  }
+
+  var existingRes = await sb
+    .from('seller_payout_methods')
+    .select('id')
+    .eq('user_id', AppState.user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingRes.error) {
+    return { data: null, error: existingRes.error };
+  }
+
+  var payload = {
+    user_id: AppState.user.id,
+    full_name: data.full_name,
+    iban: data.iban,
+    account_name: data.account_name || null,
+    bank_name: data.bank_name || null,
+    phone: data.phone,
+    email: data.email,
+    is_verified: false,
+    payout_status: 'pending'
+  };
+
+  var res = existingRes.data
+    ? await sb.from('seller_payout_methods').update(payload).eq('id', existingRes.data.id).select().single()
+    : await sb.from('seller_payout_methods').insert(payload).select().single();
+
+  if (res.error) {
+    return { data: null, error: res.error };
+  }
+
+  return { data: res.data, error: null };
+}
+
 /* ---------- Veri çekme ---------- */
 async function fetchActiveListings() {
   if (!sb) return [];
@@ -195,11 +294,17 @@ function filterListings() {
 }
 
 /* ---------- İlan Oluşturma (Bilet Sat) ---------- */
-function openSellModal() {
+async function openSellModal() {
   var modal = document.getElementById('sell-modal');
   var form = document.getElementById('sell-form');
   if (form) form.reset();
+  populateSellPayoutForm(null);
   openModalEl(modal);
+
+  if (sb && AppState.user) {
+    var payout = await loadSellerPayoutInfo();
+    populateSellPayoutForm(payout);
+  }
 }
 
 function closeSellModal() {
@@ -209,6 +314,16 @@ function closeSellModal() {
 
 async function submitNewListing(formData) {
   if (!sb || !AppState.user) throw new Error('Giriş yapmalısınız.');
+
+  var payoutData = getSellPayoutFormData();
+  if (!validateSellerPayoutInfo(payoutData)) {
+    throw new Error('Satış yapabilmek için IBAN, telefon ve e-posta bilgilerini tamamlamalısın.');
+  }
+
+  var payoutSave = await saveSellerPayoutInfo(payoutData);
+  if (payoutSave.error) {
+    throw new Error('Payout bilgileri kaydedilemedi.');
+  }
 
   var payload = {
     seller_id: AppState.user.id,

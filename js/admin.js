@@ -46,7 +46,7 @@ async function initAdminPage() {
     .single();
 
   if (error || !profile || !profile.is_admin) {
-    statusEl.textContent = 'Bu sayfaya erişim yetkiniz yok. is_admin=true olmalı.';
+    statusEl.textContent = 'Bu sayfaya erişim yetkiniz yok. Yönetici hesabı ile giriş yapmanız gerekiyor.';
     return;
   }
 
