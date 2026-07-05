@@ -129,15 +129,22 @@ function updateAuthUI() {
   var adminBtn = document.getElementById('btn-admin-panel');
 
   if (AppState.user && AppState.profile) {
-    if (loggedOutEl) loggedOutEl.classList.add('hidden');
-    if (loggedInEl) loggedInEl.classList.remove('hidden');
-    if (usernameEl) usernameEl.textContent = AppState.profile.display_name || AppState.profile.username;
-    if (adminBtn) adminBtn.classList.toggle('hidden', !AppState.profile.is_admin);
-  } else {
-    if (loggedOutEl) loggedOutEl.classList.remove('hidden');
-    if (loggedInEl) loggedInEl.classList.add('hidden');
-    if (adminBtn) adminBtn.classList.add('hidden');
+  if (loggedOutEl) loggedOutEl.classList.add('hidden');
+  if (loggedInEl) loggedInEl.classList.remove('hidden');
+  if (usernameEl) usernameEl.textContent = AppState.profile.display_name || AppState.profile.username;
+
+  if (adminBtn) {
+    adminBtn.classList.toggle('hidden', !AppState.profile.is_admin);
+    adminBtn.onclick = function () {
+      window.location.href = 'admin.html';
+    };
   }
+
+} else {
+  if (loggedOutEl) loggedOutEl.classList.remove('hidden');
+  if (loggedInEl) loggedInEl.classList.add('hidden');
+  if (adminBtn) adminBtn.classList.add('hidden');
+}
 }
 
 /* ---------- Login Modal ---------- */
