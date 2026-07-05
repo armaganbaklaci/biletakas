@@ -1142,15 +1142,22 @@ function renderIbanCardHtml(txn) {
 
   var iban = typeof BILETAKAS_IBAN !== 'undefined' ? BILETAKAS_IBAN : {};
   var breakdown = getTransactionPricingBreakdown(txn);
+
   return (
     '<div class="mt-3 rounded-xl bg-gradient-to-br from-emerald-500/10 to-accent/10 border border-emerald-500/20 p-3.5">' +
       '<p class="text-xs font-semibold text-emerald-300 mb-2">Ödeme Bilgileri (IBAN)</p>' +
       '<p class="text-sm text-white font-medium">' + escapeHtml(iban.accountName || 'Biletakas') + '</p>' +
       '<p class="text-sm text-zinc-300 mt-1">' + escapeHtml(iban.bank || '') + '</p>' +
       '<p class="text-base font-mono font-bold text-white mt-2 tracking-wide">' + escapeHtml(iban.iban || '') + '</p>' +
-      '<p class="text-xs text-zinc-400 mt-2">Toplam ödenecek: <span class="text-white font-semibold">' + formatTransactionAmount(breakdown.buyerTotalAmount) + '</span></p>' +
-      '<p class="text-xs text-zinc-500 mt-1">Alıcının ödeyeceği: <span class="text-emerald-300">' + formatTransactionAmount(breakdown.sellerPayoutAmount) + '</span></p>' +
-      '<p class="text-xs text-zinc-500 mt-1">' + escapeHtml(iban.descriptionHint || 'Açıklamaya işlem kodunu yazın.') + '</p>' +
+
+      '<div class="mt-3 rounded-lg bg-black/20 p-2">' +
+        '<p class="text-xs text-zinc-400">Toplam ödenecek: <span class="text-white font-semibold">' + formatTransactionAmount(breakdown.buyerTotalAmount) + '</span></p>' +
+        '<p class="text-xs text-zinc-500 mt-1">Satıcının eline geçecek: <span class="text-emerald-300">' + formatTransactionAmount(breakdown.sellerPayoutAmount) + '</span></p>' +
+        '<p class="text-xs text-zinc-500 mt-1">Platform komisyonu (%5): <span class="text-zinc-300">' + formatTransactionAmount(breakdown.platformCommission) + '</span></p>' +
+        '<p class="text-xs text-zinc-500 mt-1">İşlem ücreti: <span class="text-zinc-300">' + formatTransactionAmount(breakdown.serviceFee) + '</span></p>' +
+      '</div>' +
+
+      '<p class="text-xs text-zinc-500 mt-2">' + escapeHtml(iban.descriptionHint || 'Açıklamaya işlem kodunu yazın.') + '</p>' +
       '<p class="text-xs text-accent-light mt-1 font-mono">' + escapeHtml(txn.transaction_code) + '</p>' +
     '</div>'
   );
