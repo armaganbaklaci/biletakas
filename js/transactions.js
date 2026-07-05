@@ -303,7 +303,7 @@ function renderTransactionPricingSummaryHtml(txn, variant) {
       '</div>' +
       '<div class="mt-2 flex flex-wrap gap-2 text-[11px] text-zinc-400">' +
         '<span class="rounded-lg bg-black/20 px-2 py-1">Platform komisyonu (%5): ' + formatTransactionAmount(breakdown.platformCommission) + '</span>' +
-        '<span class="rounded-lg bg-black/20 px-2 py-1">İşlem ücreti: ' + formatTransactionAmount(breakdown.serviceFee) + '</span>' +
+        '<span class="rounded-lg bg-black/20 px-2 py-1">Transfer ücreti: ' + formatTransactionAmount(breakdown.serviceFee) + '</span>' +
       '</div>' +
     '</div>'
   );
@@ -1154,7 +1154,7 @@ function renderIbanCardHtml(txn) {
         '<p class="text-xs text-zinc-400">Toplam ödenecek: <span class="text-white font-semibold">' + formatTransactionAmount(breakdown.buyerTotalAmount) + '</span></p>' +
         '<p class="text-xs text-zinc-500 mt-1">Satıcının eline geçecek: <span class="text-emerald-300">' + formatTransactionAmount(breakdown.sellerPayoutAmount) + '</span></p>' +
         '<p class="text-xs text-zinc-500 mt-1">Platform komisyonu (%5): <span class="text-zinc-300">' + formatTransactionAmount(breakdown.platformCommission) + '</span></p>' +
-        '<p class="text-xs text-zinc-500 mt-1">İşlem ücreti: <span class="text-zinc-300">' + formatTransactionAmount(breakdown.serviceFee) + '</span></p>' +
+        '<p class="text-xs text-zinc-500 mt-1">Transfer ücreti: <span class="text-zinc-300">' + formatTransactionAmount(breakdown.serviceFee) + '</span></p>' +
       '</div>' +
 
       '<p class="text-xs text-zinc-500 mt-2">' + escapeHtml(iban.descriptionHint || 'Açıklamaya işlem kodunu yazın.') + '</p>' +
