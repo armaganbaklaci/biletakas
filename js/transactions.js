@@ -283,9 +283,12 @@ function getTransactionPricingBreakdown(txn) {
 
 function renderTransactionPricingSummaryHtml(txn, variant) {
   if (!txn) return '';
+
   var breakdown = getTransactionPricingBreakdown(txn);
-  var buyerTitle = variant === 'seller' ? 'Alıcının ödeyeceği' : (variant === 'admin' ? 'Tutar özeti' : 'Toplam ödenecek');
-  var sellerTitle = variant === 'seller' ? 'Satıcının eline geçecek' : 'Alıcının ödeyeceği';
+
+  var buyerTitle = 'Alıcının ödeyeceği';
+  var sellerTitle = 'Satıcının eline geçecek';
+
   return (
     '<div class="mt-3 rounded-xl border border-white/10 bg-surface-800/70 p-3">' +
       '<div class="grid grid-cols-2 gap-2 text-xs">' +
@@ -299,8 +302,8 @@ function renderTransactionPricingSummaryHtml(txn, variant) {
         '</div>' +
       '</div>' +
       '<div class="mt-2 flex flex-wrap gap-2 text-[11px] text-zinc-400">' +
-        '<span class="rounded-lg bg-black/20 px-2 py-1">Komisyon(%5): ' + formatTransactionAmount(breakdown.platformCommission) + '</span>' +
-        '<span class="rounded-lg bg-black/20 px-2 py-1">Transfer ücreti: ' + formatTransactionAmount(breakdown.serviceFee) + '</span>' +
+        '<span class="rounded-lg bg-black/20 px-2 py-1">Platform komisyonu (%5): ' + formatTransactionAmount(breakdown.platformCommission) + '</span>' +
+        '<span class="rounded-lg bg-black/20 px-2 py-1">İşlem ücreti: ' + formatTransactionAmount(breakdown.serviceFee) + '</span>' +
       '</div>' +
     '</div>'
   );
