@@ -141,7 +141,7 @@ document.querySelectorAll('.btn-txn-action').forEach(function (btn) {
 
     if (message && !window.confirm(message)) return;
 
-    updateTransactionStatus(btn.dataset.id, action);
+    handleAdminTransactionAction(btn.dataset.id, action);
   });
 });
 
