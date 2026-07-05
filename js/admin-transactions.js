@@ -108,9 +108,9 @@ function createAdminTransactionHtml(txn) {
       '<div class="mt-4 flex flex-wrap gap-2">' +
         actionBtn('ticket_verified', '✓ Bilet Doğrulandı', 'bg-indigo-600 hover:bg-indigo-500') +
         actionBtn('payment_received', '✓ Ödeme Geldi', 'bg-emerald-600 hover:bg-emerald-500') +
-        actionBtn('ticket_sent_to_buyer', '✓ Alıcıya Gönderildi', 'bg-violet-600 hover:bg-violet-500') +
+        actionBtn('ticket_sent_to_buyer', '✓ Bilet Alıcıya Gönderildi', 'bg-violet-600 hover:bg-violet-500') +
         actionBtn('buyer_confirmed', '✓ Alıcı Onayladı', 'bg-blue-600 hover:bg-blue-500') +
-        actionBtn('completed', '✓ İşlem Tamamlandı', 'bg-emerald-700 hover:bg-emerald-600') +
+        actionBtn('completed', '✓ Satıcıya Para Gönderildi', 'bg-emerald-700 hover:bg-emerald-600') +
         actionBtn('cancelled', '✓ İptal', 'bg-red-600 hover:bg-red-500') +
       '</div>' +
       '<div class="mt-4 border-t border-white/5 pt-4">' +
