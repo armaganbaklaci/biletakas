@@ -39,6 +39,7 @@ var TICKET_STATUS = {
 };
 
 var COMPLETION_STATUS = {
+  MONEY_SENT_TO_SELLER: 'money_sent_to_seller',
   PENDING: 'pending',
   BUYER_CONFIRMED: 'buyer_confirmed',
   COMPLETED: 'completed',
@@ -49,6 +50,7 @@ var TRANSACTION_ADMIN_ACTIONS = {
   TICKET_VERIFIED: 'ticket_verified',
   PAYMENT_RECEIVED: 'payment_received',
   TICKET_SENT_TO_BUYER: 'ticket_sent_to_buyer',
+  MONEY_SENT_TO_SELLER: 'money_sent_to_seller',
   BUYER_CONFIRMED: 'buyer_confirmed',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
@@ -64,6 +66,7 @@ var TRANSACTION_LOG_ACTIONS = {
   payment_received: 'transaction_payment_received',
   ticket_sent_to_buyer: 'transaction_ticket_sent_to_buyer',
   buyer_confirmed: 'transaction_buyer_confirmed',
+  money_sent_to_seller: 'transaction_money_sent_to_seller',
   completed: 'transaction_completed',
   cancelled: 'transaction_cancelled',
   // geriye dönük
@@ -78,6 +81,7 @@ var TRANSACTION_LOG_MESSAGES = {
   payment_received: 'Ödeme geldi',
   ticket_sent_to_buyer: 'Alıcıya gönderildi',
   buyer_confirmed: 'Alıcı onayladı',
+  money_sent_to_seller: 'Satıcıya para gönderildi',
   completed: 'İşlem tamamlandı',
   cancelled: 'İşlem iptal edildi'
 };
@@ -101,6 +105,7 @@ var TICKET_STATUS_LABELS = {
 var COMPLETION_STATUS_LABELS = {
   pending: 'Devam ediyor',
   buyer_confirmed: 'Alıcı onayladı',
+  money_sent_to_seller: 'Para satıcıya gönderildi',
   completed: 'Tamamlandı',
   cancelled: 'İptal'
 };
@@ -119,6 +124,7 @@ var TRANSACTION_FILTER_OPTIONS = [
   { value: 'waiting_payment', label: 'Ödeme bekleniyor' },
   { value: 'payment_received', label: 'Ödeme geldi' },
   { value: 'ticket_sent_to_buyer', label: 'Alıcıya gönderildi' },
+  { value: 'money_sent_to_seller', label: 'Satıcıya para gönderildi' },
   { value: 'completed', label: 'Tamamlandı' },
   { value: 'cancelled', label: 'İptal' }
 ];
@@ -174,6 +180,7 @@ function txnCompletionStatusBadge(status) {
     pending: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-300',
     buyer_confirmed: 'bg-blue-500/10 border-blue-500/30 text-blue-300',
     completed: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+    money_sent_to_seller: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300',
     cancelled: 'bg-red-500/10 border-red-500/30 text-red-300'
   };
   return badgeHtml(COMPLETION_STATUS_LABELS[status] || status, classes[status]);
@@ -209,30 +216,43 @@ function getUserFacingTransactionStatus(txn) {
   if (txn.completion_status === COMPLETION_STATUS.CANCELLED) {
     return { text: 'İptal edildi', cls: 'bg-red-500/10 border-red-500/30 text-red-300' };
   }
+
   if (txn.completion_status === COMPLETION_STATUS.COMPLETED) {
     return { text: 'Tamamlandı', cls: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' };
   }
+
+  if (txn.completion_status === COMPLETION_STATUS.MONEY_SENT_TO_SELLER) {
+    return { text: 'Satıcıya para gönderildi', cls: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300' };
+  }
+
   if (txn.completion_status === COMPLETION_STATUS.BUYER_CONFIRMED) {
     return { text: 'Alıcı onayladı', cls: 'bg-blue-500/10 border-blue-500/30 text-blue-300' };
   }
+
   if (txn.ticket_status === TICKET_STATUS.SENT_TO_BUYER || txn.ticket_status === TICKET_STATUS.DELIVERED) {
     return { text: 'Bilet alıcıya gönderildi', cls: 'bg-violet-500/10 border-violet-500/30 text-violet-300' };
   }
+
   if (txn.payment_status === PAYMENT_STATUS.RECEIVED && !isTicketVerified(txn)) {
     return { text: 'Ödeme alındı', cls: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' };
   }
+
   if (txn.buyer_payment_notified_at && txn.payment_status === PAYMENT_STATUS.WAITING) {
     return { text: 'Ödeme onayı bekleniyor', cls: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300' };
   }
+
   if (canShowIbanToBuyer(txn)) {
     return { text: 'Ödeme bekleniyor', cls: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300' };
   }
+
   if (txn.ticket_status === TICKET_STATUS.UPLOADED || (txn.ticket_file_path && !isTicketVerified(txn))) {
     return { text: 'Bilet doğrulaması bekleniyor', cls: 'bg-sky-500/10 border-sky-500/30 text-sky-300' };
   }
+
   if (txn.ticket_status === TICKET_STATUS.WAITING_UPLOAD || txn.ticket_status === TICKET_STATUS.WAITING) {
     return { text: 'Bilet yüklemesi bekleniyor', cls: 'bg-amber-500/10 border-amber-500/30 text-amber-300' };
   }
+
   return { text: 'Devam ediyor', cls: 'bg-zinc-500/10 border-zinc-500/30 text-zinc-300' };
 }
 
@@ -247,45 +267,78 @@ function getEnabledAdminActions(txn) {
       && txn.ticket_status === TICKET_STATUS.UPLOADED
       && !!txn.ticket_file_path
       && !txn.ticket_verified_at,
+
     payment_received: isActive
       && isTicketVerified(txn)
       && !!txn.buyer_payment_notified_at
       && txn.payment_status === PAYMENT_STATUS.WAITING,
+
     ticket_sent_to_buyer: isActive
       && txn.payment_status === PAYMENT_STATUS.RECEIVED
       && isTicketVerified(txn)
       && txn.ticket_status !== TICKET_STATUS.SENT_TO_BUYER
       && txn.ticket_status !== TICKET_STATUS.DELIVERED,
+
     buyer_confirmed: isActive
       && (txn.ticket_status === TICKET_STATUS.SENT_TO_BUYER || txn.ticket_status === TICKET_STATUS.DELIVERED)
       && txn.payment_status === PAYMENT_STATUS.RECEIVED
       && txn.completion_status === COMPLETION_STATUS.PENDING,
-    completed: txn.completion_status === COMPLETION_STATUS.BUYER_CONFIRMED,
+
+    money_sent_to_seller: isActive
+      && txn.completion_status === COMPLETION_STATUS.BUYER_CONFIRMED,
+
+    completed: isActive
+      && txn.completion_status === COMPLETION_STATUS.MONEY_SENT_TO_SELLER,
+
     cancelled: isActive
   };
 }
-
 function getUpdatesForAdminAction(action) {
   var now = new Date().toISOString();
+
   switch (action) {
     case TRANSACTION_ADMIN_ACTIONS.TICKET_VERIFIED:
     case 'ticket_verified':
-      return { ticket_status: TICKET_STATUS.VERIFIED, ticket_verified_at: now };
+      return {
+        ticket_status: TICKET_STATUS.VERIFIED,
+        ticket_verified_at: now
+      };
+
     case TRANSACTION_ADMIN_ACTIONS.PAYMENT_RECEIVED:
     case 'payment_received':
-      return { payment_status: PAYMENT_STATUS.RECEIVED };
+      return {
+        payment_status: PAYMENT_STATUS.RECEIVED
+      };
+
     case TRANSACTION_ADMIN_ACTIONS.TICKET_SENT_TO_BUYER:
     case 'ticket_sent_to_buyer':
-      return { ticket_status: TICKET_STATUS.SENT_TO_BUYER };
+      return {
+        ticket_status: TICKET_STATUS.SENT_TO_BUYER
+      };
+
     case TRANSACTION_ADMIN_ACTIONS.BUYER_CONFIRMED:
     case 'buyer_confirmed':
-      return { completion_status: COMPLETION_STATUS.BUYER_CONFIRMED };
+      return {
+        completion_status: COMPLETION_STATUS.BUYER_CONFIRMED
+      };
+
+    case 'money_sent_to_seller':
+      return {
+        completion_status: COMPLETION_STATUS.MONEY_SENT_TO_SELLER
+      };
+
     case TRANSACTION_ADMIN_ACTIONS.COMPLETED:
     case 'completed':
-      return { completion_status: COMPLETION_STATUS.COMPLETED };
+      return {
+        completion_status: COMPLETION_STATUS.COMPLETED
+      };
+
     case TRANSACTION_ADMIN_ACTIONS.CANCELLED:
     case 'cancelled':
-      return { completion_status: COMPLETION_STATUS.CANCELLED };
+      return {
+        completion_status: COMPLETION_STATUS.CANCELLED
+      };
+
     default:
       return null;
   }
@@ -312,6 +365,8 @@ function matchesTransactionFilter(txn, filter) {
     case 'ticket_sent_to_buyer':
       return txn.ticket_status === TICKET_STATUS.SENT_TO_BUYER
         || txn.ticket_status === TICKET_STATUS.DELIVERED;
+    case 'money_sent_to_seller':
+      return txn.completion_status === COMPLETION_STATUS.MONEY_SENT_TO_SELLER;
     case 'completed':
       return txn.completion_status === COMPLETION_STATUS.COMPLETED;
     case 'cancelled':
