@@ -3,6 +3,7 @@
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', function () {
+  wireNotificationsUI();
   wireAuthUI();
   wireListingsUI();
   wireOfferModalUI();

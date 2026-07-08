@@ -41,6 +41,19 @@ async function submitOffer(amount) {
   }).select().single();
 
   if (res.error) throw res.error;
+
+  var listingRes = await sb.from('listings').select('id, seller_id, artist').eq('id', _currentOfferListing.id).maybeSingle();
+  if (!listingRes.error && listingRes.data && listingRes.data.seller_id && typeof createNotification === 'function') {
+    await createNotification(
+      listingRes.data.seller_id,
+      'new_offer',
+      'Yeni teklif',
+      (AppState.profile ? AppState.profile.display_name || AppState.profile.username : 'Bir kullanıcı') + ' kullanıcısı ' + (listingRes.data.artist || 'ilan') + ' için ' + formatPrice(amount) + ' teklif verdi.',
+      null,
+      { offer_id: res.data.id, listing_id: listingRes.data.id, amount: amount }
+    );
+  }
+
   return res.data;
 }
 
@@ -178,6 +191,7 @@ async function handleOfferDecision(offerId, decision) {
     .eq('id', offerId)
     .select(`
       id,
+      buyer_id,
       amount,
       status,
       listing:listings(id, artist, seller_id),
@@ -214,6 +228,17 @@ async function handleOfferDecision(offerId, decision) {
       showToast('Teklif kabul edildi. İşlem kodu: ' + txn.transaction_code);
     } else {
       showToast('Teklif kabul edildi. İşlem oluşturuldu.');
+    }
+
+    if (typeof createNotification === 'function') {
+      await createNotification(
+        offer.buyer_id || (buyer && buyer.id) || null,
+        'offer_accepted',
+        'Teklif kabul edildi',
+        (listing.artist || 'İlan') + ' için verdiğiniz teklif kabul edildi.',
+        txn ? txn.id : null,
+        { offer_id: offerId, listing_id: listing.id || null }
+      );
     }
   } else {
     showToast('Teklif reddedildi.');

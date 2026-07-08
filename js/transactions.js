@@ -845,14 +845,33 @@ async function applyAdminTransactionAction(transactionId, action, currentTxn, lo
   if (res.data) {
     if (action === 'payment_received') {
       await writeTransactionNotification(res.data.id, res.data.seller_id, 'payment_approved', 'Ödeme onaylandı', 'Ödemeniz doğrulandı. Bilet teslim süreci başlatıldı.');
+      if (typeof createNotification === 'function') {
+        await createNotification(res.data.seller_id, 'payment_received', 'Ödeme alındı', 'Ödemeniz alındı.', res.data.id, { transaction_code: res.data.transaction_code });
+      }
     } else if (action === 'release_ticket_to_buyer') {
       await writeTransactionNotification(res.data.id, res.data.buyer_id, 'ticket_released', 'Bilet açıldı', 'Biletiniz platform üzerinden erişilebilir hale geldi.');
+      if (typeof createNotification === 'function') {
+        await createNotification(res.data.buyer_id, 'ticket_delivered', 'Bilet teslim edildi', 'Biletiniz teslim edildi.', res.data.id, { transaction_code: res.data.transaction_code });
+      }
     } else if (action === 'refund_approved') {
       await writeTransactionNotification(res.data.id, res.data.buyer_id, 'refund_approved', 'İade onaylandı', 'İade talebiniz onaylandı.');
     } else if (action === 'request_additional_evidence') {
       await writeTransactionNotification(res.data.id, res.data.buyer_id, 'additional_evidence_requested', 'Ek kanıt istendi', 'İtirazınız için ek kanıt yüklemeniz gerekiyor.');
     } else if (action === 'money_sent_to_seller' || action === 'seller_paid') {
       await writeTransactionNotification(res.data.id, res.data.seller_id, 'seller_paid', 'Ödeme gönderildi', 'Satıcı payout işlemi tamamlandı.');
+      if (typeof createNotification === 'function') {
+        await createNotification(res.data.seller_id, 'transaction_completed', 'İşlem tamamlandı', 'İşleminiz tamamlandı.', res.data.id, { transaction_code: res.data.transaction_code });
+        await createNotification(res.data.buyer_id, 'transaction_completed', 'İşlem tamamlandı', 'İşleminiz tamamlandı.', res.data.id, { transaction_code: res.data.transaction_code });
+      }
+    } else if (action === 'ticket_verified') {
+      if (typeof createNotification === 'function') {
+        await createNotification(res.data.buyer_id, 'payment_pending', 'Ödeme bekleniyor', 'Bilet doğrulandı. Şimdi ödeme yapabilirsiniz.', res.data.id, { transaction_code: res.data.transaction_code });
+      }
+    } else if (action === 'completed') {
+      if (typeof createNotification === 'function') {
+        await createNotification(res.data.seller_id, 'transaction_completed', 'İşlem tamamlandı', 'İşleminiz tamamlandı.', res.data.id, { transaction_code: res.data.transaction_code });
+        await createNotification(res.data.buyer_id, 'transaction_completed', 'İşlem tamamlandı', 'İşleminiz tamamlandı.', res.data.id, { transaction_code: res.data.transaction_code });
+      }
     }
   }
 
@@ -1071,6 +1090,17 @@ async function uploadSellerTicket(transactionId, file) {
     }
   );
 
+  if (typeof createNotification === 'function') {
+    await createNotification(
+      updateRes.data.buyer_id,
+      'ticket_uploaded',
+      'Bilet yüklendi',
+      'Satıcı biletinizi sisteme yükledi.',
+      updateRes.data.id,
+      { transaction_code: updateRes.data.transaction_code }
+    );
+  }
+
   return updateRes;
 }
 
@@ -1211,12 +1241,13 @@ async function writeTransactionNotification(transactionId, userId, type, title, 
   if (!sb || !transactionId || !userId || !type || !title || !message) return;
 
   try {
-    await sb.from('notifications').insert({
-      user_id: userId,
-      transaction_id: transactionId,
-      type: type,
-      title: title,
-      message: message
+    await sb.rpc('create_notification', {
+      p_user_id: userId,
+      p_transaction_id: transactionId,
+      p_type: type,
+      p_title: title,
+      p_message: message,
+      p_metadata: {}
     });
   } catch (err) {
     console.warn('[biletakas] Bildirim kaydedilemedi:', err);
