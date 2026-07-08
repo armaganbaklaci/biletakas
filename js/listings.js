@@ -116,7 +116,7 @@ const cutoffIso = new Date(
 
 var res = await sb
   .from('listings')
-  .select('*, seller:profiles(username, display_name, email_verified, phone_verified, instagram_verified, admin_verified, sales_count, purchase_count)')
+  .select('*, seller:profiles(id, username, display_name, avatar_url, created_at, email_verified, phone_verified, instagram_verified, admin_verified, sales_count, purchase_count)')
   .eq('status', 'active')
   .gte('event_datetime', cutoffIso)
   .order('event_datetime', { ascending: true });
@@ -153,6 +153,7 @@ function trustBadge(active, activeLabel, inactiveLabel) {
 function createListingCardHtml(listing) {
   var seller = listing.seller || {};
   var sellerName = escapeHtml(seller.display_name || seller.username || 'Kullanıcı');
+  var sellerId = seller.id || '';
   var priceLabel = formatPrice(listing.price);
   var dateLabel = formatEventDate(listing.event_datetime);
   var searchBlob = [listing.artist, listing.venue, listing.city].filter(Boolean).join(' ').toLowerCase();
@@ -167,7 +168,7 @@ function createListingCardHtml(listing) {
     ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent/15 border border-accent/30 text-accent-light text-[11px] font-semibold">🏅 Yönetici onaylı</span>'
     : '';
 
-  var salesBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-300 text-[11px] font-medium">🎟️ ' + (seller.sales_count || 0) + ' satış</span>';
+  var salesBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-300 text-[11px] font-medium">🎟️ ' + escapeHtml(formatSalesCountLabel(seller.sales_count || 0)) + '</span>';
   var purchaseBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-300 text-[11px] font-medium">🛒 ' + (seller.purchase_count || 0) + ' alış</span>';
 
   return (
@@ -195,7 +196,8 @@ function createListingCardHtml(listing) {
           '</p>' +
           '<p class="flex items-center gap-2 text-sm text-zinc-400">' +
             '<svg class="w-4 h-4 shrink-0 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>' +
-            'Satıcı: ' + sellerName +
+            'Satıcı: ' +
+            '<button type="button" class="btn-open-profile font-medium text-zinc-300 hover:text-white hover:underline transition-colors" data-profile-id="' + escapeHtml(sellerId) + '">' + sellerName + '</button>' +
           '</p>' +
           (listing.description ? '<p class="mt-1 text-sm text-zinc-500 leading-relaxed">' + escapeHtml(listing.description) + '</p>' : '') +
         '</div>' +
@@ -269,6 +271,16 @@ function renderListings(listings) {
       requireAuth(function () {
         openOfferModal(listingId, artist, price);
       });
+    });
+  });
+
+  container.querySelectorAll('.btn-open-profile').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var profileId = btn.getAttribute('data-profile-id');
+      if (!profileId) return;
+      if (typeof openProfileModal === 'function') {
+        openProfileModal(profileId);
+      }
     });
   });
 }

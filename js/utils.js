@@ -63,6 +63,18 @@ function generateAnonymousUsername() {
   return adj + noun + num;
 }
 
+function formatSalesCountLabel(count) {
+  var value = Number(count) || 0;
+  return value > 0 ? value + ' satış' : 'Yeni Üye';
+}
+
+function getSellerTierLabel(count) {
+  var value = Number(count) || 0;
+  if (value >= 50) return 'Elite Satıcı';
+  if (value >= 10) return 'Güvenilir Satıcı';
+  return '';
+}
+
 /* ---------- Modal yardımcıları ---------- */
 function openModalEl(modalEl) {
   if (!modalEl) return;
