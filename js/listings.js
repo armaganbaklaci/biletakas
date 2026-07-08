@@ -136,9 +136,9 @@ async function loadAndRenderListings() {
 
   _allListings = await fetchActiveListings();
   renderListings(_allListings);
+  renderListingFilterOptions(_allListings);
   filterListings(); // arama/filtre kutusundaki mevcut değere göre uygula
 }
-
 /* ---------- Render ---------- */
 function trustBadge(active, activeLabel, inactiveLabel) {
   if (active) {
@@ -158,7 +158,9 @@ function createListingCardHtml(listing) {
   var sellerReviewCount = Number(seller.review_count || 0);
   var priceLabel = formatPrice(listing.price);
   var dateLabel = formatEventDate(listing.event_datetime);
-  var searchBlob = [listing.artist, listing.venue, listing.city].filter(Boolean).join(' ').toLowerCase();
+  var categoryValue = listing.category || listing.ticket_category || listing.ticket_type || '';
+  var eventDateValue = listing.event_datetime ? String(listing.event_datetime).slice(0, 10) : '';
+  var searchBlob = [listing.artist, listing.venue, listing.city, categoryValue, listing.ticket_type, listing.description].filter(Boolean).join(' ').toLowerCase();
 
   var badges = [
     trustBadge(!!seller.email_verified, 'E-posta doğrulandı', 'E-posta doğrulanmadı'),
@@ -177,7 +179,7 @@ function createListingCardHtml(listing) {
     : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-400 text-[11px] font-medium">⭐ Değerlendirme yok</span>';
 
   return (
-    '<article class="listing-card overflow-hidden rounded-2xl bg-surface-800 border border-white/5 shadow-card hover:border-accent/25 transition-all duration-300" data-search="' + escapeHtml(searchBlob) + '">' +
+    '<article class="listing-card overflow-hidden rounded-2xl bg-surface-800 border border-white/5 shadow-card hover:border-accent/25 transition-all duration-300" data-search="' + escapeHtml(searchBlob) + '" data-city="' + escapeHtml(String(listing.city || '').toLowerCase()) + '" data-category="' + escapeHtml(String(categoryValue).toLowerCase()) + '" data-ticket-type="' + escapeHtml(String(listing.ticket_type || '').toLowerCase()) + '" data-date="' + escapeHtml(eventDateValue) + '" data-price="' + escapeHtml(String(listing.price || '')) + '">' +
       '<div class="h-0.5 bg-gradient-to-r from-accent via-violet-500 to-accent-light"></div>' +
       '<div class="p-4">' +
         '<div class="flex items-start justify-between gap-2 mb-3">' +
@@ -290,19 +292,91 @@ function renderListings(listings) {
   });
 }
 
+function normalizeFilterText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function populateFilterSelect(select, values, placeholder) {
+  if (!select) return;
+
+  var currentValue = select.value;
+  select.innerHTML = '<option value="">' + escapeHtml(placeholder) + '</option>';
+
+  values.forEach(function (value) {
+    if (!value) return;
+    var option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    select.appendChild(option);
+  });
+
+  if (currentValue && values.indexOf(currentValue) !== -1) {
+    select.value = currentValue;
+  }
+}
+
+function renderListingFilterOptions(listings) {
+  var cities = [];
+  var categories = [];
+  var ticketTypes = [];
+
+  (listings || []).forEach(function (listing) {
+    var city = listing.city ? String(listing.city).trim() : '';
+    var category = String(listing.category || listing.ticket_category || listing.ticket_type || '').trim();
+    var ticketType = listing.ticket_type ? String(listing.ticket_type).trim() : '';
+
+    if (city) cities.push(city);
+    if (category) categories.push(category);
+    if (ticketType) ticketTypes.push(ticketType);
+  });
+
+  cities = Array.from(new Set(cities)).sort(function (a, b) { return a.localeCompare(b, 'tr'); });
+  categories = Array.from(new Set(categories)).sort(function (a, b) { return a.localeCompare(b, 'tr'); });
+  ticketTypes = Array.from(new Set(ticketTypes)).sort(function (a, b) { return a.localeCompare(b, 'tr'); });
+
+  populateFilterSelect(document.getElementById('filter-city'), cities, 'Tüm şehirler');
+  populateFilterSelect(document.getElementById('filter-category'), categories, 'Tüm kategoriler');
+  populateFilterSelect(document.getElementById('filter-ticket-type'), ticketTypes, 'Tüm bilet türleri');
+}
+
 /* ---------- Arama / Filtre (mevcut arayüzle uyumlu) ---------- */
 function filterListings() {
   var searchInput = document.getElementById('search-input');
+  var cityFilter = document.getElementById('filter-city');
+  var categoryFilter = document.getElementById('filter-category');
+  var dateFilter = document.getElementById('filter-date');
+  var minPriceFilter = document.getElementById('filter-min-price');
+  var maxPriceFilter = document.getElementById('filter-max-price');
+  var ticketTypeFilter = document.getElementById('filter-ticket-type');
   var noResults = document.getElementById('no-results');
   if (!searchInput) return;
 
-  var query = searchInput.value.trim().toLowerCase();
+  var query = normalizeFilterText(searchInput.value);
+  var city = normalizeFilterText(cityFilter && cityFilter.value);
+  var category = normalizeFilterText(categoryFilter && categoryFilter.value);
+  var eventDate = dateFilter && dateFilter.value ? String(dateFilter.value) : '';
+  var ticketType = normalizeFilterText(ticketTypeFilter && ticketTypeFilter.value);
+  var minPrice = minPriceFilter && minPriceFilter.value !== '' ? Number(minPriceFilter.value) : null;
+  var maxPrice = maxPriceFilter && maxPriceFilter.value !== '' ? Number(maxPriceFilter.value) : null;
   var cards = document.querySelectorAll('#listings .listing-card');
   var visibleCount = 0;
 
   cards.forEach(function (card) {
-    var haystack = card.getAttribute('data-search') || card.textContent.toLowerCase();
+    var haystack = normalizeFilterText(card.getAttribute('data-search') || card.textContent);
+    var cardCity = normalizeFilterText(card.getAttribute('data-city'));
+    var cardCategory = normalizeFilterText(card.getAttribute('data-category'));
+    var cardTicketType = normalizeFilterText(card.getAttribute('data-ticket-type'));
+    var cardDate = card.getAttribute('data-date') || '';
+    var cardPrice = Number(card.getAttribute('data-price'));
     var match = !query || haystack.indexOf(query) !== -1;
+
+    if (match && city) match = cardCity === city;
+    if (match && category) match = cardCategory === category;
+    if (match && ticketType) match = cardTicketType === ticketType;
+    if (match && eventDate) match = cardDate === eventDate;
+    if (match && minPrice !== null && !isNaN(minPrice)) match = cardPrice >= minPrice;
+    if (match && maxPrice !== null && !isNaN(maxPrice)) match = cardPrice <= maxPrice;
+
     card.classList.toggle('hidden', !match);
     if (match) visibleCount++;
   });
@@ -373,6 +447,8 @@ function wireListingsUI() {
   var sellCancel = document.getElementById('sell-cancel');
   var sellForm = document.getElementById('sell-form');
   var searchInput = document.getElementById('search-input');
+  var filterIds = ['filter-city', 'filter-category', 'filter-date', 'filter-min-price', 'filter-max-price', 'filter-ticket-type'];
+  var filterReset = document.getElementById('filter-reset');
 
   function triggerSell() {
     requireAuth(openSellModal);
@@ -384,6 +460,24 @@ function wireListingsUI() {
   if (sellBackdrop) sellBackdrop.addEventListener('click', closeSellModal);
   if (sellCancel) sellCancel.addEventListener('click', closeSellModal);
   if (searchInput) searchInput.addEventListener('input', filterListings);
+
+  filterIds.forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', filterListings);
+    el.addEventListener('input', filterListings);
+  });
+
+  if (filterReset) {
+    filterReset.addEventListener('click', function () {
+      if (searchInput) searchInput.value = '';
+      filterIds.forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      filterListings();
+    });
+  }
 
   document.querySelectorAll('.filter-chip').forEach(function (chip) {
     chip.addEventListener('click', function () {
