@@ -52,7 +52,20 @@ async function openProfileModal(profileId) {
 
   if (token !== _profileLoadToken) return;
 
-  renderProfileModal(profileRes.data, statsRes && !statsRes.error && statsRes.data ? statsRes.data : null);
+  var reviewsRes = await sb
+    .from('profile_reviews')
+    .select('id, rating, review_text, created_at, reviewer:profiles(username, display_name), transaction:transactions(transaction_code)')
+    .eq('reviewed_user_id', profileId)
+    .order('created_at', { ascending: false })
+    .limit(5);
+
+  if (token !== _profileLoadToken) return;
+
+  renderProfileModal(
+    profileRes.data,
+    statsRes && !statsRes.error && statsRes.data ? statsRes.data : null,
+    reviewsRes && !reviewsRes.error && reviewsRes.data ? reviewsRes.data : []
+  );
 }
 
 function closeProfileModal() {
@@ -84,7 +97,7 @@ function renderProfileModalError(message) {
   }
 }
 
-function renderProfileModal(profile, stats) {
+function renderProfileModal(profile, stats, reviews) {
   var title = document.getElementById('profile-modal-title');
   var subtitle = document.getElementById('profile-modal-subtitle');
   var body = document.getElementById('profile-modal-body');
@@ -139,6 +152,14 @@ function renderProfileModal(profile, stats) {
           + (profile.admin_verified ? '<span class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">Topluluk Üyesi</span>' : '')
         + '</div>'
       + '</div>'
+
+      + '<div class="rounded-2xl border border-white/10 bg-surface-700/60 p-4">'
+        + '<div class="flex items-center justify-between gap-3 mb-3">'
+          + '<p class="text-xs uppercase tracking-wide text-zinc-500">Son değerlendirmeler</p>'
+          + '<span class="text-xs text-zinc-500">' + escapeHtml(reviewCount > 0 ? reviewCount + ' yorum' : 'Henüz yorum yok') + '</span>'
+        + '</div>'
+        + (reviews && reviews.length ? reviews.map(renderProfileReviewItem).join('') : '<p class="text-sm text-zinc-500">Bu profil için henüz değerlendirme yok.</p>')
+      + '</div>'
     + '</div>';
 }
 
@@ -181,4 +202,38 @@ function formatProfileDate(value) {
   var date = new Date(value);
   if (isNaN(date.getTime())) return '-';
   return date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' });
+}
+
+function renderProfileReviewItem(review) {
+  var reviewer = review && review.reviewer ? review.reviewer : {};
+  var reviewerName = reviewer.display_name || reviewer.username || 'Kullanıcı';
+  var transactionCode = review && review.transaction && review.transaction.transaction_code ? review.transaction.transaction_code : '';
+  var stars = renderStarRating(review && review.rating ? review.rating : 0);
+
+  return ''
+    + '<div class="rounded-xl border border-white/10 bg-black/10 p-3 mb-2 last:mb-0">'
+      + '<div class="flex items-center justify-between gap-3">'
+        + '<div>'
+          + '<p class="text-sm font-semibold text-white">' + escapeHtml(reviewerName) + '</p>'
+          + '<p class="text-[11px] text-zinc-500">' + escapeHtml(transactionCode ? transactionCode : 'İşlem yorumu') + '</p>'
+        + '</div>'
+        + '<div class="text-right">'
+          + '<div class="text-amber-300 text-sm font-semibold">' + stars + '</div>'
+          + '<p class="text-[11px] text-zinc-500">' + escapeHtml(formatReviewDate(review && review.created_at)) + '</p>'
+        + '</div>'
+      + '</div>'
+      + (review && review.review_text ? '<p class="mt-2 text-sm text-zinc-300 leading-relaxed">' + escapeHtml(review.review_text) + '</p>' : '<p class="mt-2 text-sm text-zinc-500">Yorum yok.</p>')
+    + '</div>';
+}
+
+function renderStarRating(value) {
+  var filled = Math.max(0, Math.min(5, Number(value) || 0));
+  return '★★★★★'.slice(0, filled) + '<span class="text-zinc-700">' + '★★★★★'.slice(filled) + '</span>';
+}
+
+function formatReviewDate(value) {
+  if (!value) return '-';
+  var date = new Date(value);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('tr-TR');
 }

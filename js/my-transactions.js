@@ -3,10 +3,45 @@
 // ============================================================
 
 var _myTransactionsCache = [];
+var _myTransactionReviewsCache = {};
 
 async function fetchMyTransactions() {
   if (!sb || !AppState.user) return [];
   return fetchUserTransactions(AppState.user.id);
+}
+
+async function fetchMyTransactionReviews(transactions) {
+  if (!sb || !AppState.user) return {};
+
+  var ids = (transactions || [])
+    .map(function (txn) { return txn.id; })
+    .filter(Boolean);
+
+  if (!ids.length) return {};
+
+  var res = await sb
+    .from('profile_reviews')
+    .select('transaction_id, reviewed_user_id, rating, review_text, created_at')
+    .eq('reviewer_id', AppState.user.id)
+    .in('transaction_id', ids)
+    .order('created_at', { ascending: false });
+
+  if (res.error) {
+    console.error('[biletakas] İşlem değerlendirmeleri çekilemedi:', res.error);
+    return {};
+  }
+
+  var map = {};
+  (res.data || []).forEach(function (review) {
+    if (review && review.transaction_id) map[review.transaction_id] = review;
+  });
+  return map;
+}
+
+async function refreshMyTransactionsModal() {
+  var transactions = await fetchMyTransactions();
+  _myTransactionReviewsCache = await fetchMyTransactionReviews(transactions);
+  renderMyTransactions(transactions, _myTransactionReviewsCache);
 }
 
 function renderSellerTicketSection(txn) {
@@ -113,11 +148,51 @@ function renderBuyerPaymentSection(txn) {
   return html;
 }
 
-function renderMyTransactions(transactions) {
+function renderTransactionReviewSection(txn, reviewMap) {
+  if (!txn || txn.completion_status !== 'completed') return '';
+
+  var reviewedUserId = txn.buyer_id === AppState.user.id ? txn.seller_id : txn.buyer_id;
+  var existingReview = reviewMap && reviewMap[txn.id] ? reviewMap[txn.id] : null;
+
+  if (existingReview) {
+    return (
+      '<div class="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3">' +
+        '<p class="text-xs font-semibold text-emerald-300 mb-1">Değerlendirmeniz kaydedildi</p>' +
+        '<p class="text-sm text-white">' + renderReviewStars(existingReview.rating) + '</p>' +
+        (existingReview.review_text ? '<p class="mt-2 text-xs text-emerald-100/90 leading-relaxed">' + escapeHtml(existingReview.review_text) + '</p>' : '') +
+      '</div>'
+    );
+  }
+
+  return (
+    '<form class="txn-review-form mt-3 rounded-xl border border-violet-500/20 bg-violet-500/10 p-3" data-id="' + txn.id + '" data-reviewed-user-id="' + reviewedUserId + '">' +
+      '<p class="text-xs font-semibold text-violet-300 mb-2">Karşı tarafı değerlendir</p>' +
+      '<label class="block text-[11px] text-zinc-400 mb-1">Yıldız</label>' +
+      '<select class="txn-review-rating w-full rounded-lg bg-surface-700 border border-white/10 px-3 py-2 text-sm text-white">' +
+        '<option value="5">5 - Mükemmel</option>' +
+        '<option value="4">4 - İyi</option>' +
+        '<option value="3">3 - Orta</option>' +
+        '<option value="2">2 - Zayıf</option>' +
+        '<option value="1">1 - Kötü</option>' +
+      '</select>' +
+      '<label class="block text-[11px] text-zinc-400 mt-3 mb-1">Kısa yorum</label>' +
+      '<textarea class="txn-review-text w-full rounded-lg bg-surface-700 border border-white/10 px-3 py-2 text-sm text-white" rows="3" maxlength="240" placeholder="Kısa yorum yazın..."></textarea>' +
+      '<button type="submit" class="btn-txn-submit-review mt-3 w-full py-2.5 rounded-lg bg-gradient-to-r from-violet-600 to-accent text-white text-xs font-semibold hover:brightness-110 transition-all">Değerlendirmeyi Gönder</button>' +
+    '</form>'
+  );
+}
+
+function renderReviewStars(rating) {
+  var value = Math.max(0, Math.min(5, Number(rating) || 0));
+  return '★'.repeat(value) + '<span class="text-zinc-600">' + '★'.repeat(5 - value) + '</span>';
+}
+
+function renderMyTransactions(transactions, reviewMap) {
   var container = document.getElementById('my-transactions-list');
   if (!container) return;
 
   _myTransactionsCache = transactions || [];
+  _myTransactionReviewsCache = reviewMap || _myTransactionReviewsCache || {};
 
   if (!transactions || transactions.length === 0) {
     container.innerHTML = '<p class="text-center text-sm text-zinc-500 py-8">Henüz işleminiz yok.</p>';
@@ -149,6 +224,7 @@ function renderMyTransactions(transactions) {
         renderTransactionPricingSummaryHtml(txn, txn.seller_id === AppState.user.id ? 'seller' : 'buyer') +
         renderSellerTicketSection(txn) +
         renderBuyerPaymentSection(txn) +
+        renderTransactionReviewSection(txn, _myTransactionReviewsCache) +
       '</div>'
     );
   }).join('');
@@ -198,6 +274,68 @@ function wireMyTransactionEvents() {
       handleBuyerOpenDispute(btn.getAttribute('data-id'));
     });
   });
+
+  document.querySelectorAll('.txn-review-form').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      handleTransactionReviewSubmit(form.getAttribute('data-id'));
+    });
+  });
+}
+
+async function handleTransactionReviewSubmit(transactionId) {
+  var form = document.querySelector('.txn-review-form[data-id="' + transactionId + '"]');
+  if (!form) return;
+
+  var txn = _myTransactionsCache.find(function (item) { return item.id === transactionId; });
+  if (!txn || txn.completion_status !== 'completed') {
+    showToast('Bu işlem için değerlendirme yapılamıyor.');
+    return;
+  }
+
+  var ratingEl = form.querySelector('.txn-review-rating');
+  var textEl = form.querySelector('.txn-review-text');
+  var rating = Number(ratingEl ? ratingEl.value : 0);
+  var reviewText = textEl ? textEl.value.trim() : '';
+  var reviewedUserId = form.getAttribute('data-reviewed-user-id');
+
+  if (!rating || rating < 1 || rating > 5) {
+    showToast('Lütfen 1-5 arası yıldız seçin.');
+    return;
+  }
+
+  var reviewBtn = form.querySelector('.btn-txn-submit-review');
+  if (reviewBtn) {
+    reviewBtn.disabled = true;
+    reviewBtn.classList.add('opacity-60');
+  }
+
+  try {
+    var res = await sb.from('profile_reviews').insert({
+      reviewed_user_id: reviewedUserId,
+      reviewer_id: AppState.user.id,
+      transaction_id: transactionId,
+      rating: rating,
+      review_text: reviewText || null
+    }).select().single();
+
+    if (res.error || !res.data) {
+      if (res.error && String(res.error.message || '').toLowerCase().indexOf('duplicate') !== -1) {
+        showToast('Bu işlem için zaten değerlendirme yapılmış.');
+      } else {
+        showToast((res.error && res.error.message) || 'Değerlendirme kaydedilemedi.');
+      }
+      return;
+    }
+
+    showToast('Değerlendirmeniz kaydedildi.');
+    await refreshMyTransactionsModal();
+  } finally {
+    if (reviewBtn) {
+      reviewBtn.disabled = false;
+      reviewBtn.classList.remove('opacity-60');
+    }
+  }
 }
 
 async function handleSellerTicketUpload(transactionId) {
@@ -220,8 +358,7 @@ async function handleSellerTicketUpload(transactionId) {
       return;
     }
     showToast('Bilet yüklendi. Admin doğrulaması bekleniyor.');
-    var transactions = await fetchMyTransactions();
-    renderMyTransactions(transactions);
+    await refreshMyTransactionsModal();
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -251,8 +388,7 @@ async function handleBuyerReceiptUpload(transactionId) {
       return;
     }
     showToast('Dekont yüklendi. Admin onayı bekleniyor.');
-    var transactions = await fetchMyTransactions();
-    renderMyTransactions(transactions);
+    await refreshMyTransactionsModal();
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -304,8 +440,7 @@ async function handleBuyerPaymentNotify(transactionId) {
   }
 
   showToast('Ödeme bildirimin alındı. Admin onayı bekleniyor.');
-  var transactions = await fetchMyTransactions();
-  renderMyTransactions(transactions);
+  await refreshMyTransactionsModal();
 }
 
 async function handleBuyerOpenDispute(transactionId) {
@@ -327,8 +462,7 @@ async function handleBuyerOpenDispute(transactionId) {
       return;
     }
     showToast('Sorun bildirimi oluşturuldu. Admin inceleyecek.');
-    var transactions = await fetchMyTransactions();
-    renderMyTransactions(transactions);
+    await refreshMyTransactionsModal();
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -357,8 +491,7 @@ async function handleBuyerConfirmReceipt(transactionId) {
   );
 
   showToast('Onayınız kaydedildi.');
-  var transactions = await fetchMyTransactions();
-  renderMyTransactions(transactions);
+  await refreshMyTransactionsModal();
 }
 
 function openMyTransactionsModal() {
@@ -367,8 +500,7 @@ function openMyTransactionsModal() {
     var list = document.getElementById('my-transactions-list');
     list.innerHTML = '<p class="text-center text-sm text-zinc-500 py-8">Yükleniyor…</p>';
     openModalEl(modal);
-    var transactions = await fetchMyTransactions();
-    renderMyTransactions(transactions);
+    await refreshMyTransactionsModal();
   });
 }
 

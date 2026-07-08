@@ -116,7 +116,7 @@ const cutoffIso = new Date(
 
 var res = await sb
   .from('listings')
-  .select('*, seller:profiles(id, username, display_name, avatar_url, created_at, email_verified, phone_verified, instagram_verified, admin_verified, sales_count, purchase_count)')
+  .select('*, seller:profiles(id, username, display_name, avatar_url, created_at, email_verified, phone_verified, instagram_verified, admin_verified, sales_count, purchase_count, average_rating, review_count)')
   .eq('status', 'active')
   .gte('event_datetime', cutoffIso)
   .order('event_datetime', { ascending: true });
@@ -154,6 +154,8 @@ function createListingCardHtml(listing) {
   var seller = listing.seller || {};
   var sellerName = escapeHtml(seller.display_name || seller.username || 'Kullanıcı');
   var sellerId = seller.id || '';
+  var sellerRating = Number(seller.average_rating || 0);
+  var sellerReviewCount = Number(seller.review_count || 0);
   var priceLabel = formatPrice(listing.price);
   var dateLabel = formatEventDate(listing.event_datetime);
   var searchBlob = [listing.artist, listing.venue, listing.city].filter(Boolean).join(' ').toLowerCase();
@@ -170,6 +172,9 @@ function createListingCardHtml(listing) {
 
   var salesBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-300 text-[11px] font-medium">🎟️ ' + escapeHtml(formatSalesCountLabel(seller.sales_count || 0)) + '</span>';
   var purchaseBadge = '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-300 text-[11px] font-medium">🛒 ' + (seller.purchase_count || 0) + ' alış</span>';
+  var ratingBadge = sellerReviewCount > 0
+    ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-300 text-[11px] font-medium">⭐ ' + sellerRating.toFixed(1) + ' (' + sellerReviewCount + ')</span>'
+    : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-700 text-zinc-400 text-[11px] font-medium">⭐ Değerlendirme yok</span>';
 
   return (
     '<article class="listing-card overflow-hidden rounded-2xl bg-surface-800 border border-white/5 shadow-card hover:border-accent/25 transition-all duration-300" data-search="' + escapeHtml(searchBlob) + '">' +
@@ -206,7 +211,7 @@ function createListingCardHtml(listing) {
           '<span class="px-2 py-0.5 rounded-md bg-surface-700 text-zinc-300 text-xs font-medium">' + Number(listing.quantity || 1) + ' bilet</span>' +
         '</div>' +
         '<div class="mt-3 flex flex-wrap items-center gap-1.5">' +
-          badges + adminBadge + salesBadge + purchaseBadge +
+          badges + adminBadge + salesBadge + purchaseBadge + ratingBadge +
         '</div>' +
         '<div class="mt-3 flex flex-wrap items-center gap-2">' +
           '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-medium">' +
