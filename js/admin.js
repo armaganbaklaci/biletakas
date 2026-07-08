@@ -58,6 +58,7 @@ async function initAdminPage() {
     loadPendingListings(),
     loadAdminOffers(),
     loadAdminTransactions(),
+    loadAdminDisputes(),
     loadAdminUsers(),
     loadListingHistory(),
     loadAdminLogs()

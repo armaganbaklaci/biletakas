@@ -15,6 +15,21 @@ function escapeHtml(value) {
 var _allAdminTransactions = [];
 var _sellerPayoutCache = {};
 
+function isDisputedTransaction(txn) {
+  return !!txn && ((txn.dispute_status && txn.dispute_status !== 'none') || !!txn.dispute_reason || !!txn.dispute_category);
+}
+
+function formatDisputeCategoryLabel(value) {
+  var labels = {
+    invalid_ticket: 'Bilet geçersizdi',
+    left_at_gate: 'Kapıda kaldım',
+    used_before: 'Bilet daha önce kullanılmıştı',
+    wrong_ticket: 'Yanlış bilet gönderildi',
+    other: 'Diğer'
+  };
+  return labels[value] || value || 'Belirtilmedi';
+}
+
 async function fetchSellerPayoutInfoForUser(userId) {
   if (!sb || !userId) return null;
   if (_sellerPayoutCache[userId]) return _sellerPayoutCache[userId];
@@ -56,6 +71,19 @@ async function loadAdminTransactions() {
   renderAdminTransactions();
 }
 
+async function loadAdminDisputes() {
+  var container = document.getElementById('admin-disputes-list');
+  if (!container) return;
+
+  if (!_allAdminTransactions.length) {
+    _allAdminTransactions = await fetchAllTransactions();
+    await hydrateAdminTransactionSellerPayouts(_allAdminTransactions);
+  }
+
+  renderAdminDisputesShell();
+  renderAdminDisputes();
+}
+
 function renderAdminTransactionsShell() {
   var container = document.getElementById('admin-transactions-list');
   if (!container) return;
@@ -94,6 +122,110 @@ function renderAdminTransactions() {
     : '<p class="text-zinc-500">Filtreye uygun işlem yok.</p>';
 
   wireAdminTransactionEvents();
+}
+
+function renderAdminDisputesShell() {
+  var container = document.getElementById('admin-disputes-list');
+  if (!container) return;
+
+  container.innerHTML =
+    '<div class="rounded-xl bg-zinc-900 border border-white/10 p-4 mb-2 grid md:grid-cols-2 gap-3">' +
+      '<input id="dispute-search" class="rounded-lg bg-zinc-950 border border-white/10 px-3 py-2 text-sm" placeholder="İtiraz kodu, kullanıcı veya sanatçı ara...">' +
+      '<select id="dispute-filter" class="rounded-lg bg-zinc-950 border border-white/10 px-3 py-2 text-sm">' +
+        '<option value="all">Tümü</option>' +
+        '<option value="open">Açık</option>' +
+        '<option value="under_review">İncelemede</option>' +
+        '<option value="resolved">Çözüldü</option>' +
+        '<option value="rejected">Reddedildi</option>' +
+      '</select>' +
+    '</div>' +
+    '<div id="dispute-results" class="grid gap-4"></div>';
+
+  var searchEl = document.getElementById('dispute-search');
+  var filterEl = document.getElementById('dispute-filter');
+  if (searchEl) searchEl.addEventListener('input', renderAdminDisputes);
+  if (filterEl) filterEl.addEventListener('change', renderAdminDisputes);
+}
+
+function renderAdminDisputes() {
+  var resultsEl = document.getElementById('dispute-results');
+  if (!resultsEl) return;
+
+  var q = (document.getElementById('dispute-search')?.value || '').trim();
+  var filter = document.getElementById('dispute-filter')?.value || 'all';
+
+  var rows = _allAdminTransactions.filter(function (txn) {
+    var statusMatch = filter === 'all' || txn.dispute_status === filter;
+    return isDisputedTransaction(txn) && statusMatch && matchesTransactionSearch(txn, q);
+  });
+
+  resultsEl.innerHTML = rows.length
+    ? rows.map(createAdminDisputeHtml).join('')
+    : '<p class="text-zinc-500">İtiraz kaydı bulunamadı.</p>';
+
+  wireAdminTransactionEvents();
+}
+
+function createAdminDisputeHtml(txn) {
+  var listing = txn.listing || {};
+  var buyer = txn.buyer || {};
+  var seller = txn.seller || {};
+  var sellerPayout = txn._sellerPayout || {};
+  var actions = getEnabledAdminActions(txn);
+  var categoryLabel = formatDisputeCategoryLabel(txn.dispute_category);
+
+  function actionBtn(key, label, colorClass) {
+    var enabled = actions[key];
+    var disabledCls = enabled ? '' : ' opacity-40 cursor-not-allowed';
+    var disabledAttr = enabled ? '' : ' disabled';
+    return '<button type="button" class="btn-txn-action px-3 py-2 rounded-lg text-xs font-semibold ' + colorClass + disabledCls + '" data-id="' + txn.id + '" data-action="' + key + '"' + disabledAttr + '>' + escapeHtml(label) + '</button>';
+  }
+
+  return (
+    '<div class="rounded-xl bg-zinc-900 border border-amber-500/20 p-4" data-transaction-id="' + txn.id + '">' +
+      '<div class="flex flex-col lg:flex-row lg:justify-between gap-4">' +
+        '<div class="flex-1">' +
+          '<div class="flex flex-wrap items-center gap-2 mb-1">' +
+            '<h3 class="text-lg font-bold font-mono">' + escapeHtml(txn.transaction_code) + '</h3>' +
+            txnCompletionStatusBadge(txn.completion_status) +
+            txnPaymentStatusBadge(txn.payment_status) +
+            txnTicketStatusBadge(txn.ticket_status) +
+          '</div>' +
+          '<p class="text-sm text-zinc-400">Sanatçı: <span class="text-white">' + escapeHtml(listing.artist || '-') + '</span></p>' +
+          '<p class="text-sm text-zinc-400">Alıcı: ' + escapeHtml(profileDisplayName(buyer)) + ' · Satıcı: ' + escapeHtml(profileDisplayName(seller)) + '</p>' +
+          '<div class="mt-2 flex flex-wrap gap-2">' +
+            '<span class="px-2 py-1 rounded-lg text-xs border bg-amber-500/10 border-amber-500/20 text-amber-300">İtiraz</span>' +
+            '<span class="px-2 py-1 rounded-lg text-xs border bg-zinc-800 border-white/10 text-zinc-300">' + escapeHtml(categoryLabel) + '</span>' +
+          '</div>' +
+          '<p class="text-xs text-zinc-500 mt-2">Açılma: ' + formatTransactionDate(txn.dispute_created_at || txn.updated_at || txn.created_at) + '</p>' +
+          (txn.dispute_requested_at ? '<p class="text-xs text-zinc-500">Ek kanıt istendi: ' + formatTransactionDate(txn.dispute_requested_at) + '</p>' : '') +
+          (txn.dispute_description ? '<p class="text-sm text-zinc-300 mt-3">Açıklama: ' + escapeHtml(txn.dispute_description) + '</p>' : '') +
+          (txn.dispute_reason ? '<p class="text-sm text-zinc-300 mt-2">Detay: ' + escapeHtml(txn.dispute_reason) + '</p>' : '') +
+          (txn.dispute_evidence_path ? '<div class="mt-3"><button type="button" class="btn-txn-view-dispute px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold" data-path="' + escapeHtml(txn.dispute_evidence_path) + '">Kanıtı Gör / İndir</button></div>' : '') +
+        '</div>' +
+        '<div class="lg:text-right">' +
+          '<p class="text-2xl font-bold">' + formatTransactionAmount(getTransactionPricingBreakdown(txn).buyerTotalAmount) + '</p>' +
+          '<p class="text-sm text-emerald-300">Net satıcı: ' + formatTransactionAmount(getTransactionPricingBreakdown(txn).sellerPayoutAmount) + '</p>' +
+        '</div>' +
+      '</div>' +
+      (sellerPayout.iban || sellerPayout.phone || sellerPayout.email
+        ? '<div class="mt-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm">' +
+            '<p class="text-[11px] uppercase tracking-wide text-emerald-300 font-semibold mb-1">Satıcı Payout Bilgileri</p>' +
+            (sellerPayout.full_name ? '<p class="text-white">' + escapeHtml(sellerPayout.full_name) + '</p>' : '') +
+            (sellerPayout.iban ? '<p class="text-zinc-300 mt-1">IBAN: ' + escapeHtml(sellerPayout.iban) + '</p>' : '') +
+            (sellerPayout.account_name ? '<p class="text-zinc-300">Hesap Adı: ' + escapeHtml(sellerPayout.account_name) + '</p>' : '') +
+            (sellerPayout.bank_name ? '<p class="text-zinc-300">Banka: ' + escapeHtml(sellerPayout.bank_name) + '</p>' : '') +
+            (sellerPayout.phone ? '<p class="text-zinc-300">Telefon: ' + escapeHtml(sellerPayout.phone) + '</p>' : '') +
+            (sellerPayout.email ? '<p class="text-zinc-300">E-posta: ' + escapeHtml(sellerPayout.email) + '</p>' : '') +
+          '</div>'
+        : '') +
+      '<div class="mt-4 flex flex-wrap gap-2">' +
+        actionBtn('buyer_refunded', 'İade Et', 'bg-rose-700 hover:bg-rose-600') +
+        actionBtn('seller_paid', 'Satıcıya Ödeme Yap', 'bg-emerald-600 hover:bg-emerald-500') +
+        actionBtn('request_additional_evidence', 'Ek Kanıt İste', 'bg-amber-600 hover:bg-amber-500') +
+      '</div>' +
+    '</div>'
+  );
 }
 
 function createAdminTransactionHtml(txn) {
@@ -213,6 +345,8 @@ function wireAdminTransactionEvents() {
 };
 
 document.querySelectorAll('.btn-txn-action').forEach(function (btn) {
+  if (btn.dataset.wired === '1') return;
+  btn.dataset.wired = '1';
   btn.addEventListener('click', function () {
     const action = btn.dataset.action;
     const message = TXN_CONFIRM_MESSAGES[action];
@@ -224,24 +358,32 @@ document.querySelectorAll('.btn-txn-action').forEach(function (btn) {
 });
 
   document.querySelectorAll('.btn-txn-note').forEach(function (btn) {
+  if (btn.dataset.wired === '1') return;
+  btn.dataset.wired = '1';
     btn.addEventListener('click', function () {
       handleSaveTransactionNote(btn.getAttribute('data-id'));
     });
   });
 
   document.querySelectorAll('.btn-txn-view-ticket').forEach(function (btn) {
+  if (btn.dataset.wired === '1') return;
+  btn.dataset.wired = '1';
     btn.addEventListener('click', function () {
       handleViewTicketFile(btn.getAttribute('data-path'));
     });
   });
 
   document.querySelectorAll('.btn-txn-view-receipt').forEach(function (btn) {
+  if (btn.dataset.wired === '1') return;
+  btn.dataset.wired = '1';
     btn.addEventListener('click', function () {
       handleViewReceiptFile(btn.getAttribute('data-path'));
     });
   });
 
   document.querySelectorAll('.btn-txn-view-dispute').forEach(function (btn) {
+  if (btn.dataset.wired === '1') return;
+  btn.dataset.wired = '1';
     btn.addEventListener('click', function () {
       handleViewDisputeEvidenceFile(btn.getAttribute('data-path'));
     });

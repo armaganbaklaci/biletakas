@@ -30,6 +30,7 @@
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="pending">Bekleyen İlanlar</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="offers">Teklifler</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="transactions">İşlemler</button>
+      <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="disputes">İtirazlar</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="users">Kullanıcılar</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="history">İlan Geçmişi</button>
       <button class="admin-tab px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold" data-tab="logs">İşlem Geçmişi</button>
@@ -99,6 +100,14 @@
         <p class="text-sm text-zinc-400">Manuel IBAN ödemelerini ve bilet teslim sürecini buradan yönet.</p>
       </div>
       <section id="admin-transactions-list" class="grid gap-4"></section>
+    </section>
+
+    <section id="tab-disputes" class="admin-panel hidden">
+      <div class="mb-4">
+        <h2 class="text-2xl font-bold">İtirazlar</h2>
+        <p class="text-sm text-zinc-400">Açılmış itirazları incele, ek kanıt iste, iade et ya da satıcıya ödeme yap.</p>
+      </div>
+      <section id="admin-disputes-list" class="grid gap-4"></section>
     </section>
 
     <section id="tab-users" class="admin-panel hidden">

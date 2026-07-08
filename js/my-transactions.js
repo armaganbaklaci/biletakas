@@ -112,17 +112,6 @@ function renderBuyerPaymentSection(txn) {
     html += '<button type="button" class="btn-txn-paid mt-3 w-full py-2.5 rounded-lg bg-emerald-600/90 text-white text-xs font-semibold hover:bg-emerald-600 transition-all" data-id="' + txn.id + '">Ödeme Yaptım</button>';
   }
 
-  if (!txn.dispute_reason && txn.completion_status === 'pending') {
-    html += (
-      '<div class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">' +
-        '<p class="text-[11px] font-medium text-amber-300 mb-2">Sorun Bildir</p>' +
-        '<textarea class="txn-dispute-reason w-full rounded-lg bg-surface-700 border border-white/10 px-3 py-2 text-xs text-zinc-200" rows="3" data-id="' + txn.id + '" placeholder="Örn. Bilet kapıda okutulmadı, farklı bilet geldi..."></textarea>' +
-        '<input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" class="txn-dispute-file mt-2 w-full text-xs text-zinc-400 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-surface-600 file:text-white file:text-xs file:font-semibold" data-id="' + txn.id + '">' +
-        '<button type="button" class="btn-txn-open-dispute mt-3 w-full py-2.5 rounded-lg bg-amber-600/90 text-white text-xs font-semibold hover:bg-amber-600 transition-all" data-id="' + txn.id + '">Sorun Bildir / Bilet Kapıda Okutulmadı</button>' +
-      '</div>'
-    );
-  }
-
   if (txn.dispute_reason) {
     html += '<p class="mt-3 text-xs text-amber-300">Sorun bildirimi: ' + escapeHtml(txn.dispute_reason) + '</p>';
   }
@@ -146,6 +135,51 @@ function renderBuyerPaymentSection(txn) {
   }
 
   return html;
+}
+
+function renderBuyerDisputeSection(txn) {
+  if (txn.buyer_id !== AppState.user.id) return '';
+  if (txn.dispute_status === 'under_review' && txn.dispute_requested_at) {
+    return (
+      '<div class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">' +
+        '<p class="text-[11px] font-medium text-amber-300 mb-2">Ek kanıt istendi</p>' +
+        '<p class="text-[11px] text-zinc-400 mb-2">İtirazın incelenmesi için ek dosya yükleyebilirsin.</p>' +
+        '<input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" class="txn-dispute-evidence-file w-full text-xs text-zinc-400 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-surface-600 file:text-white file:text-xs file:font-semibold" data-id="' + txn.id + '">' +
+        '<button type="button" class="btn-txn-upload-dispute-evidence mt-3 w-full py-2.5 rounded-lg bg-amber-600/90 text-white text-xs font-semibold hover:bg-amber-600 transition-all" data-id="' + txn.id + '">Ek Kanıt Yükle</button>' +
+      '</div>'
+    );
+  }
+
+  if (!canBuyerOpenDispute(txn)) {
+    if (txn.dispute_status && txn.dispute_status !== 'none') {
+      return '<p class="mt-3 text-xs text-amber-300">İtiraz durumu: ' + escapeHtml(txn.dispute_reason || 'İşlem inceleniyor') + '</p>';
+    }
+    return '';
+  }
+
+  var options = [
+    ['invalid_ticket', 'Bilet geçersizdi'],
+    ['left_at_gate', 'Kapıda kaldım'],
+    ['used_before', 'Bilet daha önce kullanılmıştı'],
+    ['wrong_ticket', 'Yanlış bilet gönderildi'],
+    ['other', 'Diğer']
+  ];
+
+  return (
+    '<div class="mt-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3">' +
+      '<p class="text-[11px] font-medium text-amber-300 mb-2">Sorun Bildir</p>' +
+      '<p class="text-[11px] text-zinc-400 mb-2">Etkinlikten sonra itiraz oluşturabilirsin.</p>' +
+      '<select class="txn-dispute-category w-full rounded-lg bg-surface-700 border border-white/10 px-3 py-2 text-xs text-zinc-200" data-id="' + txn.id + '">' +
+        '<option value="">Sorun nedenini seçin</option>' +
+        options.map(function (pair) {
+          return '<option value="' + pair[0] + '">' + escapeHtml(pair[1]) + '</option>';
+        }).join('') +
+      '</select>' +
+      '<textarea class="txn-dispute-description mt-2 w-full rounded-lg bg-surface-700 border border-white/10 px-3 py-2 text-xs text-zinc-200" rows="3" data-id="' + txn.id + '" placeholder="Kısaca ne olduğunu yazın..."></textarea>' +
+      '<input type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" class="txn-dispute-file mt-2 w-full text-xs text-zinc-400 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-surface-600 file:text-white file:text-xs file:font-semibold" data-id="' + txn.id + '">' +
+      '<button type="button" class="btn-txn-open-dispute mt-3 w-full py-2.5 rounded-lg bg-amber-600/90 text-white text-xs font-semibold hover:bg-amber-600 transition-all" data-id="' + txn.id + '">Sorun Bildir</button>' +
+    '</div>'
+  );
 }
 
 function renderTransactionReviewSection(txn, reviewMap) {
@@ -224,6 +258,7 @@ function renderMyTransactions(transactions, reviewMap) {
         renderTransactionPricingSummaryHtml(txn, txn.seller_id === AppState.user.id ? 'seller' : 'buyer') +
         renderSellerTicketSection(txn) +
         renderBuyerPaymentSection(txn) +
+        renderBuyerDisputeSection(txn) +
         renderTransactionReviewSection(txn, _myTransactionReviewsCache) +
       '</div>'
     );
@@ -272,6 +307,22 @@ function wireMyTransactionEvents() {
   document.querySelectorAll('.btn-txn-open-dispute').forEach(function (btn) {
     btn.addEventListener('click', function () {
       handleBuyerOpenDispute(btn.getAttribute('data-id'));
+    });
+  });
+
+  document.querySelectorAll('.btn-txn-upload-dispute-evidence').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      handleBuyerAdditionalDisputeEvidence(btn.getAttribute('data-id'));
+    });
+  });
+
+  document.querySelectorAll('.txn-dispute-category').forEach(function (select) {
+    select.addEventListener('change', function () {
+      var id = select.getAttribute('data-id');
+      var relatedText = document.querySelector('.txn-dispute-description[data-id="' + id + '"]');
+      if (relatedText && select.value === 'other' && !relatedText.value.trim()) {
+        relatedText.focus();
+      }
     });
   });
 
@@ -444,9 +495,11 @@ async function handleBuyerPaymentNotify(transactionId) {
 }
 
 async function handleBuyerOpenDispute(transactionId) {
-  var reasonInput = document.querySelector('.txn-dispute-reason[data-id="' + transactionId + '"]');
+  var categoryInput = document.querySelector('.txn-dispute-category[data-id="' + transactionId + '"]');
+  var descriptionInput = document.querySelector('.txn-dispute-description[data-id="' + transactionId + '"]');
   var fileInput = document.querySelector('.txn-dispute-file[data-id="' + transactionId + '"]');
-  var reason = reasonInput ? reasonInput.value : '';
+  var category = categoryInput ? categoryInput.value : '';
+  var description = descriptionInput ? descriptionInput.value : '';
   var file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
 
   var btn = document.querySelector('.btn-txn-open-dispute[data-id="' + transactionId + '"]');
@@ -456,12 +509,43 @@ async function handleBuyerOpenDispute(transactionId) {
   }
 
   try {
-    var res = await openBuyerDispute(transactionId, reason, file);
+    var res = await openBuyerDispute(transactionId, category, description, file);
     if (res.error || !res.data) {
       showToast((res.error && res.error.message) || 'Sorun bildirimi oluşturulamadı.');
       return;
     }
     showToast('Sorun bildirimi oluşturuldu. Admin inceleyecek.');
+    await refreshMyTransactionsModal();
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-60');
+    }
+  }
+}
+
+async function handleBuyerAdditionalDisputeEvidence(transactionId) {
+  var fileInput = document.querySelector('.txn-dispute-evidence-file[data-id="' + transactionId + '"]');
+  var file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+  if (!file) {
+    showToast('Lütfen bir kanıt dosyası seçin.');
+    return;
+  }
+
+  var btn = document.querySelector('.btn-txn-upload-dispute-evidence[data-id="' + transactionId + '"]');
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('opacity-60');
+  }
+
+  try {
+    var res = await uploadAdditionalDisputeEvidence(transactionId, file);
+    if (res.error || !res.data) {
+      showToast((res.error && res.error.message) || 'Ek kanıt yüklenemedi.');
+      return;
+    }
+    showToast('Ek kanıt yüklendi.');
     await refreshMyTransactionsModal();
   } finally {
     if (btn) {

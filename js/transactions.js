@@ -77,6 +77,7 @@ var TRANSACTION_ADMIN_ACTIONS = {
   REFUND_REJECTED: 'refund_rejected',
   BUYER_REFUNDED: 'buyer_refunded',
   SELLER_PAID: 'seller_paid',
+  REQUEST_ADDITIONAL_EVIDENCE: 'request_additional_evidence',
   // geriye dönük alias
   TICKET_RECEIVED: 'ticket_verified',
   DELIVERED_TO_BUYER: 'ticket_sent_to_buyer'
@@ -97,6 +98,9 @@ var TRANSACTION_LOG_ACTIONS = {
   refund_rejected: 'transaction_refund_rejected',
   buyer_refunded: 'transaction_buyer_refunded',
   seller_paid: 'transaction_seller_paid',
+  request_additional_evidence: 'transaction_request_additional_evidence',
+  dispute_evidence_uploaded: 'transaction_dispute_evidence_uploaded',
+  dispute_opened: 'transaction_dispute_opened',
   completed: 'transaction_completed',
   cancelled: 'transaction_cancelled',
   // geriye dönük
@@ -119,6 +123,9 @@ var TRANSACTION_LOG_MESSAGES = {
   refund_rejected: 'İade reddedildi',
   buyer_refunded: 'Alıcıya iade yapıldı',
   seller_paid: 'Satıcıya ödeme yapıldı',
+  request_additional_evidence: 'Ek kanıt istendi',
+  dispute_evidence_uploaded: 'Ek kanıt yüklendi',
+  dispute_opened: 'İtiraz açıldı',
   completed: 'İşlem tamamlandı',
   cancelled: 'İşlem iptal edildi'
 };
@@ -191,9 +198,12 @@ var TRANSACTION_SELECT_FIELDS = [
   'payout_sent_at',
   'payout_status',
   'dispute_status',
+  'dispute_category',
   'dispute_reason',
+  'dispute_description',
   'dispute_evidence_path',
   'dispute_created_at',
+  'dispute_requested_at',
   'admin_note',
   'receipt_file_path',
   'receipt_uploaded_at',
@@ -205,7 +215,7 @@ var TRANSACTION_SELECT_FIELDS = [
   'buyer_payment_notified_at',
   'created_at',
   'updated_at',
-  'listing:listings(id, artist, venue, city, price)',
+  'listing:listings(id, artist, venue, city, price, event_datetime)',
   'buyer:profiles!buyer_id(username, display_name)',
   'seller:profiles!seller_id(username, display_name)'
 ].join(', ');
@@ -346,6 +356,13 @@ function canBuyerAccessTicket(txn) {
   return txn.ticket_status === TICKET_STATUS.SENT_TO_BUYER
     || txn.ticket_status === TICKET_STATUS.RELEASED_TO_BUYER
     || txn.ticket_status === TICKET_STATUS.DELIVERED;
+}
+
+function canBuyerOpenDispute(txn) {
+  if (!txn || !txn.listing || !txn.listing.event_datetime) return false;
+  if (txn.completion_status === COMPLETION_STATUS.CANCELLED) return false;
+  if (txn.dispute_status && txn.dispute_status !== 'none') return false;
+  return isPastDate(txn.listing.event_datetime);
 }
 
 function getUserFacingTransactionStatus(txn) {
@@ -490,6 +507,12 @@ function getEnabledAdminActions(txn) {
       && txn.dispute_status !== 'resolved'
       && txn.payout_status !== PAYOUT_STATUS.SENT,
 
+    request_additional_evidence: isActive
+      && !!txn.dispute_status
+      && txn.dispute_status !== 'none'
+      && txn.dispute_status !== 'rejected'
+      && txn.dispute_status !== 'resolved',
+
     completed: isActive
       && txn.completion_status === COMPLETION_STATUS.MONEY_SENT_TO_SELLER,
 
@@ -612,6 +635,13 @@ async function getUpdatesForAdminAction(action, txn) {
         dispute_status: 'resolved',
         payout_status: PAYOUT_STATUS.SENT,
         payout_sent_at: now
+      };
+
+    case 'request_additional_evidence':
+      return {
+        dispute_status: 'under_review',
+        dispute_requested_at: now,
+        payout_status: PAYOUT_STATUS.PROCESSING
       };
 
     case TRANSACTION_ADMIN_ACTIONS.COMPLETED:
@@ -819,6 +849,8 @@ async function applyAdminTransactionAction(transactionId, action, currentTxn, lo
       await writeTransactionNotification(res.data.id, res.data.buyer_id, 'ticket_released', 'Bilet açıldı', 'Biletiniz platform üzerinden erişilebilir hale geldi.');
     } else if (action === 'refund_approved') {
       await writeTransactionNotification(res.data.id, res.data.buyer_id, 'refund_approved', 'İade onaylandı', 'İade talebiniz onaylandı.');
+    } else if (action === 'request_additional_evidence') {
+      await writeTransactionNotification(res.data.id, res.data.buyer_id, 'additional_evidence_requested', 'Ek kanıt istendi', 'İtirazınız için ek kanıt yüklemeniz gerekiyor.');
     } else if (action === 'money_sent_to_seller' || action === 'seller_paid') {
       await writeTransactionNotification(res.data.id, res.data.seller_id, 'seller_paid', 'Ödeme gönderildi', 'Satıcı payout işlemi tamamlandı.');
     }
@@ -895,14 +927,20 @@ async function uploadPayoutReceipt(transactionId, file) {
   });
 }
 
-async function openBuyerDispute(transactionId, reason, file) {
+async function openBuyerDispute(transactionId, category, description, file) {
   if (!sb || !AppState.user) {
     return { data: null, error: new Error('Giriş yapmalısınız.') };
   }
 
-  var trimmedReason = (reason || '').trim();
-  if (!trimmedReason) {
-    return { data: null, error: new Error('Lütfen bir sorun nedeni yazın.') };
+  var trimmedCategory = (category || '').trim();
+  var trimmedDescription = (description || '').trim();
+
+  if (!trimmedCategory) {
+    return { data: null, error: new Error('Lütfen bir sorun nedeni seçin.') };
+  }
+
+  if (!trimmedDescription) {
+    return { data: null, error: new Error('Lütfen kısa bir açıklama yazın.') };
   }
 
   var storagePath = null;
@@ -918,7 +956,8 @@ async function openBuyerDispute(transactionId, reason, file) {
 
   var now = new Date().toISOString();
   var res = await updateTransactionFields(transactionId, {
-    dispute_reason: trimmedReason,
+    dispute_category: trimmedCategory,
+    dispute_reason: trimmedDescription,
     dispute_evidence_path: storagePath,
     dispute_status: 'open',
     dispute_created_at: now,
@@ -928,12 +967,13 @@ async function openBuyerDispute(transactionId, reason, file) {
   if (res.error || !res.data) return res;
 
   await writeTransactionLog(
-    'refund_approved',
+    'dispute_opened',
     'Alıcı sorun bildirdi — ' + (res.data.transaction_code || ''),
     {
       transaction_id: res.data.id,
       transaction_code: res.data.transaction_code,
-      dispute_reason: trimmedReason,
+      dispute_category: trimmedCategory,
+      dispute_reason: trimmedDescription,
       dispute_status: 'open'
     }
   );
@@ -943,7 +983,53 @@ async function openBuyerDispute(transactionId, reason, file) {
     res.data.seller_id,
     'dispute_opened',
     'Sorun bildirimi',
-    'Alıcı bir sorun bildirdi. Admin inceleyecek.'
+      'Alıcı bir sorun bildirdi. Admin inceleyecek.'
+  );
+
+  return res;
+}
+
+async function uploadAdditionalDisputeEvidence(transactionId, file) {
+  if (!sb || !AppState.user) {
+    return { data: null, error: new Error('Giriş yapmalısınız.') };
+  }
+
+  var validationError = validateReceiptFile(file);
+  if (validationError) return { data: null, error: new Error(validationError) };
+
+  var storagePath = buildDisputeEvidenceStoragePath(transactionId, file.name);
+  var uploadRes = await sb.storage
+    .from('transaction-receipts')
+    .upload(storagePath, file, { upsert: true, contentType: file.type || undefined });
+
+  if (uploadRes.error) return { data: null, error: uploadRes.error };
+
+  var now = new Date().toISOString();
+  var res = await updateTransactionFields(transactionId, {
+    dispute_evidence_path: storagePath,
+    dispute_status: 'open',
+    dispute_requested_at: null,
+    dispute_created_at: now
+  });
+
+  if (res.error || !res.data) return res;
+
+  await writeTransactionLog(
+    'dispute_evidence_uploaded',
+    'Alıcı ek kanıt yükledi — ' + (res.data.transaction_code || ''),
+    {
+      transaction_id: res.data.id,
+      transaction_code: res.data.transaction_code,
+      dispute_evidence_path: storagePath
+    }
+  );
+
+  await writeTransactionNotification(
+    res.data.id,
+    res.data.seller_id,
+    'dispute_evidence_uploaded',
+    'Ek kanıt yüklendi',
+    'Alıcı itiraz için ek kanıt yükledi. Lütfen inceleyin.'
   );
 
   return res;
